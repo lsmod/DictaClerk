@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "react-vite-ts",
+  "productName": "DictaClerk",
   "version": "0.1.0",
-  "identifier": "y",
+  "identifier": "com.lsmod.dictaclerk",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "react-vite-ts",
+        "title": "DictaClerk",
         "width": 800,
         "height": 600
       }

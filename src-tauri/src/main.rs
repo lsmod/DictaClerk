@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    react_vite_ts_lib::run()
+    dicta_clerk_lib::run()
 }

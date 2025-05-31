@@ -50,6 +50,13 @@ sudo pacman -S webkit2gtk-4.1 gtk3 libappindicator-gtk3 librsvg
 pnpm tauri build
 ```
 
+## Troubleshooting
+
+```bash
+pnpm tauri dev --verbose
+pnpm tauri --info # ensure we have all correctly setup
+```
+
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
