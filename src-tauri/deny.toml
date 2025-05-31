@@ -1,0 +1,71 @@
+# deny.toml - Configuration for cargo-deny
+# See https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "x86_64-pc-windows-msvc" },
+    { triple = "x86_64-apple-darwin" },
+]
+
+[advisories]
+version = 2
+ignore = []
+# We want to disallow vulnerabilities at all costs
+vulnerability = "deny"
+# Warn about unmaintained packages
+unmaintained = "warn"
+# Warn about yanked packages
+yanked = "warn"
+# Ignore notice level advisories
+notice = "warn"
+
+[licenses]
+version = 2
+# List of allowed licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+]
+# Complain about copyleft licenses
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-1.0",
+    "AGPL-3.0",
+]
+# Warn about other licenses
+unlicensed = "deny"
+copyleft = "warn"
+
+[bans]
+version = 2
+# List of crates to ban
+deny = [
+    # Deny old vulnerable versions
+    { name = "openssl", version = "<0.10.55" },
+    # Deny known problematic crates
+    { name = "time", version = "<0.2.23" },
+]
+
+# Allow duplicates for some common crates that often have version conflicts
+skip = [
+    { name = "windows_aarch64_gnullvm" },
+    { name = "windows_aarch64_msvc" },
+    { name = "windows_i686_gnu" },
+    { name = "windows_i686_msvc" },
+    { name = "windows_x86_64_gnu" },
+    { name = "windows_x86_64_gnullvm" },
+    { name = "windows_x86_64_msvc" },
+]
+
+[sources]
+version = 2
+# Allow crates from crates.io and local paths
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = [] 
