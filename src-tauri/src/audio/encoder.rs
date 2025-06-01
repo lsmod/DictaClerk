@@ -192,7 +192,7 @@ impl Encoder for OggOpusEncoder {
             .collect();
         let samples = samples?;
         
-        let total_frames = (samples.len() + frame_size - 1) / frame_size;
+        let total_frames = samples.len().div_ceil(frame_size);
         let mut frames_encoded = 0;
         let mut bytes_written = 0u64;
         let mut size_warning_sent = false;

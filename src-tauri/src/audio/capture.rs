@@ -7,9 +7,13 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tempfile::NamedTempFile;
 use tokio::sync::{Mutex, mpsc};
+use thiserror::Error;
+
+/// Type alias for RMS callback to reduce complexity
+type RmsCallback = Arc<Mutex<Option<Box<dyn Fn(f32) + Send + Sync>>>>;
 
 /// Error types for audio capture operations
-#[derive(Debug, thiserror::Error)]
+#[derive(Error, Debug)]
 pub enum AudioCaptureError {
     #[error("Audio device unavailable: {0}")]
     AudioDeviceUnavailable(String),
@@ -49,8 +53,14 @@ pub trait AudioCapture: Send + Sync {
 pub struct AudioCaptureState {
     pub is_recording: Arc<AtomicBool>,
     pub current_file_path: Arc<Mutex<Option<PathBuf>>>,
-    pub rms_callback: Arc<Mutex<Option<Box<dyn Fn(f32) + Send + Sync>>>>,
+    pub rms_callback: RmsCallback,
     pub stop_sender: Arc<Mutex<Option<mpsc::UnboundedSender<()>>>>,
+}
+
+impl Default for AudioCaptureState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AudioCaptureState {
@@ -140,7 +150,7 @@ impl LiveAudioCapture {
             .iter()
             .map(|&sample| {
                 // Clamp to [-1.0, 1.0] and convert to i16
-                let clamped = sample.max(-1.0).min(1.0);
+                let clamped = sample.clamp(-1.0, 1.0);
                 (clamped * i16::MAX as f32) as i16
             })
             .collect()
