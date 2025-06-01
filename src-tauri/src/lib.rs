@@ -1,7 +1,7 @@
-mod audio;
+pub mod audio;
 mod commands;
 
-use commands::{AudioCaptureState, init_audio_capture, start_capture, stop_capture, is_recording, subscribe_rms};
+use commands::{AudioCaptureState, init_audio_capture, start_capture, stop_capture, is_recording, subscribe_rms, encode_wav_to_ogg, get_encoder_info};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -22,7 +22,9 @@ pub fn run() {
             start_capture,
             stop_capture,
             is_recording,
-            subscribe_rms
+            subscribe_rms,
+            encode_wav_to_ogg,
+            get_encoder_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
