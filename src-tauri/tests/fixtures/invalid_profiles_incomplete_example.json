@@ -1,0 +1,9 @@
+{
+  "profiles": [
+    {
+      "id": "medical",
+      "name": "Medical Transcription",
+      "example_input": "Patient presents with chest pain"
+    }
+  ]
+}

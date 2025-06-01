@@ -1,5 +1,6 @@
 pub mod audio;
 mod commands;
+pub mod config;
 pub mod services;
 
 use commands::{
@@ -7,6 +8,7 @@ use commands::{
     is_recording, is_whisper_initialized, start_capture, stop_capture, subscribe_rms,
     transcribe_audio, transcribe_recorded_audio, AudioCaptureState, WhisperClientState,
 };
+use config::validate_config_files;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -18,6 +20,12 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Validate configuration files before starting the application
+    if let Err(e) = validate_config_files() {
+        eprintln!("Configuration validation failed: {}", e);
+        std::process::exit(1);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(Mutex::new(None)) as AudioCaptureState)
