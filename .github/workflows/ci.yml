@@ -57,7 +57,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: Install system dependencies for Tauri
+      - name: Install system dependencies for Tauri and audio encoding
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev \
@@ -68,7 +68,12 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            cmake \
+            pkg-config \
+            libogg-dev \
+            libopus-dev \
+            libasound2-dev
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
@@ -87,6 +92,9 @@ jobs:
 
       - name: Run Rust tests
         run: cd src-tauri && cargo test
+
+      - name: Run Rust integration tests
+        run: cd src-tauri && cargo test --test integration_test
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -140,7 +148,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: Install system dependencies for Tauri
+      - name: Install system dependencies for Tauri and audio encoding
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev \
@@ -151,7 +159,12 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            cmake \
+            pkg-config \
+            libogg-dev \
+            libopus-dev \
+            libasound2-dev
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
