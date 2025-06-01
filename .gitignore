@@ -25,3 +25,17 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Personal configuration files
+.bashrc_aliases
+scripts/setup-aliases.sh
+
+# Rust target directory (if accidentally created locally)
+src-tauri/target/
+
+# Temporary build directories
+/tmp/rust-builds/
+
+# Personal environment files
+.env.local
+.env.personal

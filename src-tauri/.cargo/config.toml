@@ -1,0 +1,21 @@
+[build]
+# Use a shared target directory for all Rust projects
+# This avoids duplicating compiled dependencies
+target-dir = "/tmp/rust-builds/dicta-clerk"
+
+[target.x86_64-unknown-linux-gnu]
+# Optimizations to reduce build size
+rustflags = ["-C", "link-arg=-s"]
+
+# Configuration for development builds
+[profile.dev]
+# Reduce debug information to save space
+debug = 1
+# Disable overflow checking in dev for faster builds
+overflow-checks = false
+# Optimize a bit even in debug mode
+opt-level = 1
+
+[profile.dev.package."*"]
+# Optimize dependencies even in debug mode
+opt-level = 2
