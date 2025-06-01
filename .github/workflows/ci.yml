@@ -72,7 +72,8 @@ jobs:
             cmake \
             pkg-config \
             libogg-dev \
-            libopus-dev
+            libopus-dev \
+            libasound2-dev
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
@@ -162,7 +163,8 @@ jobs:
             cmake \
             pkg-config \
             libogg-dev \
-            libopus-dev
+            libopus-dev \
+            libasound2-dev
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
