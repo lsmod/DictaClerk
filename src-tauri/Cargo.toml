@@ -33,3 +33,5 @@ thiserror = "1.0"
 opus = "0.3"
 ogg = "0.9"
 byteorder = "1.5"
+# HTTP client for Whisper API
+reqwest = { version = "0.12", features = ["json", "multipart"] }
