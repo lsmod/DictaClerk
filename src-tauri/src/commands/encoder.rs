@@ -1,4 +1,4 @@
-use crate::audio::{Encoder, OggOpusEncoder, OggInfo, EncodingEvent};
+use crate::audio::{Encoder, EncodingEvent, OggInfo, OggOpusEncoder};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
@@ -10,18 +10,24 @@ pub async fn encode_wav_to_ogg(
 ) -> Result<OggInfo, String> {
     let wav_path = PathBuf::from(wav_path);
     let output_path = output_path.map(PathBuf::from);
-    
+
     let encoder = OggOpusEncoder::new();
-    
+
     // Create a channel for progress events (optional for this command)
     let (tx, mut rx) = mpsc::unbounded_channel();
-    
+
     // Spawn a task to handle events (for now just log them)
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                EncodingEvent::Progress { bytes_processed, estimated_total } => {
-                    println!("Encoding progress: {}/{} bytes", bytes_processed, estimated_total);
+                EncodingEvent::Progress {
+                    bytes_processed,
+                    estimated_total,
+                } => {
+                    println!(
+                        "Encoding progress: {}/{} bytes",
+                        bytes_processed, estimated_total
+                    );
                 }
                 EncodingEvent::SizeAlmostLimit { estimated_size } => {
                     println!("Warning: Size approaching limit: {} bytes", estimated_size);
@@ -35,7 +41,7 @@ pub async fn encode_wav_to_ogg(
             }
         }
     });
-    
+
     encoder
         .encode(&wav_path, output_path.as_deref(), Some(tx))
         .await
@@ -52,4 +58,4 @@ pub fn get_encoder_info() -> serde_json::Value {
         "size_limit_mb": 23,
         "forecast_accuracy": "≤2%"
     })
-} 
+}

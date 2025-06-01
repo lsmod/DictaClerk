@@ -43,23 +43,69 @@ These libraries are automatically linked during the Rust build process via the `
 
 ## Development
 
+### Setup
+
 1. Install dependencies:
 
    ```bash
    pnpm install
    ```
 
-2. Start development server:
+2. **Set up pre-commit hooks (Recommended):**
+
+   ```bash
+   # Automated setup
+   ./setup-precommit.sh
+
+   # Or manual setup
+   pip install pre-commit
+   pre-commit install
+   ```
+
+   This will automatically run formatting, linting, and tests before each commit.
+
+3. Start development server:
 
    ```bash
    pnpm tauri dev
    ```
 
-3. Run linting:
-   ```bash
-   pnpm lint
-   pnpm lint:fix
-   ```
+### Pre-commit Hooks
+
+We use pre-commit hooks to ensure code quality:
+
+- **Rust formatting** (`cargo fmt --check`)
+- **Rust linting** (`cargo clippy`)
+- **Rust tests** (`cargo test`)
+- **Frontend formatting** (Prettier)
+- **General file checks** (trailing whitespace, merge conflicts, etc.)
+
+**Benefits:**
+
+- Prevents improperly formatted code from being committed
+- Catches linting issues early
+- Ensures tests pass before commit
+- Maintains consistent code style across the team
+
+**Commands:**
+
+```bash
+# Run all hooks manually
+pre-commit run --all-files
+
+# Skip hooks for a specific commit (not recommended)
+git commit --no-verify
+
+# Update hook versions
+pre-commit autoupdate
+```
+
+### Linting
+
+```bash
+pnpm lint
+pnpm lint:fix
+```
 
 ## Build
 
@@ -102,6 +148,7 @@ pnpm tauri --info # ensure we have all correctly setup
 - **Audio library linking errors**: Ensure libogg-dev, libopus-dev, and libasound2-dev are installed
 - **ALSA errors**: Install libasound2-dev (Ubuntu/Debian) or alsa-lib-devel (Fedora/CentOS)
 - **Build failures**: Check that all system dependencies are properly installed
+- **Pre-commit hooks failing**: Run `cargo fmt` and `cargo clippy --fix` in `src-tauri/` directory
 
 ## Recommended IDE Setup
 
