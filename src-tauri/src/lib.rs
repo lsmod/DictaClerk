@@ -1,5 +1,6 @@
 pub mod audio;
 mod commands;
+pub mod services;
 
 use commands::{
     encode_wav_to_ogg, get_encoder_info, init_audio_capture, is_recording, start_capture,
