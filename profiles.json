@@ -6,6 +6,7 @@
       "description": "Standard transcription profile for general use",
       "prompt": "Please transcribe the following audio accurately, maintaining natural punctuation and formatting.",
       "active": true,
+      "visible": true,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
     },
@@ -17,6 +18,7 @@
       "example_input": "Patient presents with acute myocardial infarction",
       "example_output": "Patient presents with acute myocardial infarction.",
       "active": true,
+      "visible": true,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
     },
@@ -26,6 +28,7 @@
       "description": "Profile optimized for legal terminology and formal language",
       "prompt": "Transcribe legal proceedings with formal language, proper legal terminology, and accurate punctuation.",
       "active": false,
+      "visible": false,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
     }

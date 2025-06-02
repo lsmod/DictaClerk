@@ -35,6 +35,9 @@ pub enum ConfigError {
 
     #[error("Profile validation failed: example_input is provided but example_output is missing")]
     IncompleteProfileExample,
+
+    #[error("Maximum five visible profiles")]
+    MaxVisibleProfilesExceeded,
 }
 
 /// Settings JSON Schema - defines application-wide settings
@@ -188,6 +191,11 @@ const PROFILES_SCHEMA: &str = r#"{
             "default": true,
             "description": "Whether this profile is active"
           },
+          "visible": {
+            "type": ["boolean", "null"],
+            "default": false,
+            "description": "Whether this profile is visible in the UI (max 5)"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -314,6 +322,9 @@ fn validate_profiles_file<P: AsRef<Path>>(path: P) -> Result<(), ConfigError> {
     // Additional validation: check example_input/example_output consistency
     validate_profile_examples(&json)?;
 
+    // Additional validation: enforce visible profiles limit
+    validate_visible_profiles_limit(&json)?;
+
     Ok(())
 }
 
@@ -340,6 +351,27 @@ fn validate_profile_examples(json: &Value) -> Result<(), ConfigError> {
             if has_example_input && !has_example_output {
                 return Err(ConfigError::IncompleteProfileExample);
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates the visible profiles limit
+fn validate_visible_profiles_limit(json: &Value) -> Result<(), ConfigError> {
+    if let Some(profiles) = json.get("profiles").and_then(|p| p.as_array()) {
+        let visible_count = profiles
+            .iter()
+            .filter(|profile| {
+                profile
+                    .get("visible")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+            })
+            .count();
+
+        if visible_count > 5 {
+            return Err(ConfigError::MaxVisibleProfilesExceeded);
         }
     }
 
@@ -477,5 +509,164 @@ mod tests {
             ConfigError::FileNotFound { .. } => {}
             _ => panic!("Expected FileNotFound error"),
         }
+    }
+
+    #[test]
+    fn test_visible_profiles_within_limit() {
+        let valid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "visible": true
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "visible": true
+                },
+                {
+                    "id": "profile3",
+                    "name": "Profile 3",
+                    "visible": false
+                },
+                {
+                    "id": "profile4",
+                    "name": "Profile 4",
+                    "visible": null
+                },
+                {
+                    "id": "profile5",
+                    "name": "Profile 5"
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, valid_profiles).unwrap();
+
+        assert!(validate_profiles_file(&profiles_path).is_ok());
+    }
+
+    #[test]
+    fn test_visible_profiles_at_limit() {
+        let valid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "visible": true
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "visible": true
+                },
+                {
+                    "id": "profile3",
+                    "name": "Profile 3",
+                    "visible": true
+                },
+                {
+                    "id": "profile4",
+                    "name": "Profile 4",
+                    "visible": true
+                },
+                {
+                    "id": "profile5",
+                    "name": "Profile 5",
+                    "visible": true
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, valid_profiles).unwrap();
+
+        assert!(validate_profiles_file(&profiles_path).is_ok());
+    }
+
+    #[test]
+    fn test_visible_profiles_exceeds_limit() {
+        let invalid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "visible": true
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "visible": true
+                },
+                {
+                    "id": "profile3",
+                    "name": "Profile 3",
+                    "visible": true
+                },
+                {
+                    "id": "profile4",
+                    "name": "Profile 4",
+                    "visible": true
+                },
+                {
+                    "id": "profile5",
+                    "name": "Profile 5",
+                    "visible": true
+                },
+                {
+                    "id": "profile6",
+                    "name": "Profile 6",
+                    "visible": true
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, invalid_profiles).unwrap();
+
+        let result = validate_profiles_file(&profiles_path);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::MaxVisibleProfilesExceeded => {}
+            _ => panic!("Expected MaxVisibleProfilesExceeded error"),
+        }
+    }
+
+    #[test]
+    fn test_visible_profiles_null_and_false_ignored() {
+        let valid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "visible": true
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "visible": false
+                },
+                {
+                    "id": "profile3",
+                    "name": "Profile 3",
+                    "visible": null
+                },
+                {
+                    "id": "profile4",
+                    "name": "Profile 4"
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, valid_profiles).unwrap();
+
+        assert!(validate_profiles_file(&profiles_path).is_ok());
     }
 }

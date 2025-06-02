@@ -63,6 +63,8 @@ pub struct Profile {
     pub example_output: Option<String>,
     /// Whether this profile is active
     pub active: bool,
+    /// Whether this profile is visible in the UI (max 5)
+    pub visible: Option<bool>,
     /// Profile creation timestamp
     pub created_at: String,
     /// Profile last update timestamp
@@ -97,6 +99,9 @@ pub enum ProfileError {
 
     #[error("Profile not found: {id}")]
     ProfileNotFound { id: String },
+
+    #[error("Maximum five visible profiles")]
+    MaxVisibleProfilesExceeded,
 }
 
 /// Result type for profile operations
@@ -279,6 +284,22 @@ impl ProfileEngine {
             message: format!("Failed to parse profiles JSON: {}", e),
         })
     }
+
+    /// Validate a profile collection before saving
+    /// Enforces business rules like visible profile limits
+    pub fn validate_profiles_collection(&self, profiles: &ProfileCollection) -> ProfileResult<()> {
+        let visible_count = profiles
+            .profiles
+            .iter()
+            .filter(|profile| profile.visible.unwrap_or(false))
+            .count();
+
+        if visible_count > 5 {
+            return Err(ProfileError::MaxVisibleProfilesExceeded);
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for ProfileEngine {
@@ -300,6 +321,7 @@ mod tests {
             example_input: None,
             example_output: None,
             active: true,
+            visible: None,
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),
         }
@@ -314,6 +336,7 @@ mod tests {
             example_input: None,
             example_output: None,
             active: true,
+            visible: None,
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),
         }
@@ -328,6 +351,7 @@ mod tests {
             example_input: Some("patient has fever".to_string()),
             example_output: Some("Patient presents with fever.".to_string()),
             active: true,
+            visible: None,
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),
         }
@@ -557,5 +581,99 @@ mod tests {
 
         let expected = "Format as medical report\n\nExamples:\npatient has fever → Patient presents with fever.\n\nText:\npatient is sick";
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_validate_profiles_collection_within_limit() {
+        let engine = ProfileEngine::new();
+        let mut profile1 = create_test_profile();
+        profile1.id = "profile1".to_string();
+        profile1.visible = Some(true);
+
+        let mut profile2 = create_test_profile();
+        profile2.id = "profile2".to_string();
+        profile2.visible = Some(true);
+
+        let mut profile3 = create_test_profile();
+        profile3.id = "profile3".to_string();
+        profile3.visible = Some(false);
+
+        let profiles = ProfileCollection {
+            profiles: vec![profile1, profile2, profile3],
+            default_profile_id: "profile1".to_string(),
+        };
+
+        assert!(engine.validate_profiles_collection(&profiles).is_ok());
+    }
+
+    #[test]
+    fn test_validate_profiles_collection_at_limit() {
+        let engine = ProfileEngine::new();
+        let mut profiles_vec = Vec::new();
+
+        for i in 1..=5 {
+            let mut profile = create_test_profile();
+            profile.id = format!("profile{}", i);
+            profile.visible = Some(true);
+            profiles_vec.push(profile);
+        }
+
+        let profiles = ProfileCollection {
+            profiles: profiles_vec,
+            default_profile_id: "profile1".to_string(),
+        };
+
+        assert!(engine.validate_profiles_collection(&profiles).is_ok());
+    }
+
+    #[test]
+    fn test_validate_profiles_collection_exceeds_limit() {
+        let engine = ProfileEngine::new();
+        let mut profiles_vec = Vec::new();
+
+        for i in 1..=6 {
+            let mut profile = create_test_profile();
+            profile.id = format!("profile{}", i);
+            profile.visible = Some(true);
+            profiles_vec.push(profile);
+        }
+
+        let profiles = ProfileCollection {
+            profiles: profiles_vec,
+            default_profile_id: "profile1".to_string(),
+        };
+
+        let result = engine.validate_profiles_collection(&profiles);
+        assert!(matches!(
+            result,
+            Err(ProfileError::MaxVisibleProfilesExceeded)
+        ));
+    }
+
+    #[test]
+    fn test_validate_profiles_collection_null_and_false_ignored() {
+        let engine = ProfileEngine::new();
+        let mut profile1 = create_test_profile();
+        profile1.id = "profile1".to_string();
+        profile1.visible = Some(true);
+
+        let mut profile2 = create_test_profile();
+        profile2.id = "profile2".to_string();
+        profile2.visible = Some(false);
+
+        let mut profile3 = create_test_profile();
+        profile3.id = "profile3".to_string();
+        profile3.visible = None;
+
+        let mut profile4 = create_test_profile();
+        profile4.id = "profile4".to_string();
+        // visible field is None by default
+
+        let profiles = ProfileCollection {
+            profiles: vec![profile1, profile2, profile3, profile4],
+            default_profile_id: "profile1".to_string(),
+        };
+
+        assert!(engine.validate_profiles_collection(&profiles).is_ok());
     }
 }

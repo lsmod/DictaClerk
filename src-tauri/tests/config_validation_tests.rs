@@ -305,3 +305,150 @@ fn test_settings_invalid_values() {
         }
     });
 }
+
+#[test]
+fn test_visible_profiles_within_limit() {
+    let valid_settings = r#"{
+        "whisper": {
+            "api_key": "sk-test123"
+        }
+    }"#;
+
+    let valid_profiles = r#"{
+        "profiles": [
+            {
+                "id": "profile1",
+                "name": "Profile 1",
+                "visible": true
+            },
+            {
+                "id": "profile2",
+                "name": "Profile 2",
+                "visible": true
+            },
+            {
+                "id": "profile3",
+                "name": "Profile 3",
+                "visible": false
+            },
+            {
+                "id": "profile4",
+                "name": "Profile 4",
+                "visible": null
+            },
+            {
+                "id": "profile5",
+                "name": "Profile 5"
+            }
+        ]
+    }"#;
+
+    with_temp_dir(valid_settings, valid_profiles, || {
+        let result = validate_config_files();
+        assert!(
+            result.is_ok(),
+            "Profiles within visible limit should be valid"
+        );
+    });
+}
+
+#[test]
+fn test_visible_profiles_at_limit() {
+    let valid_settings = r#"{
+        "whisper": {
+            "api_key": "sk-test123"
+        }
+    }"#;
+
+    let valid_profiles = r#"{
+        "profiles": [
+            {
+                "id": "profile1",
+                "name": "Profile 1",
+                "visible": true
+            },
+            {
+                "id": "profile2",
+                "name": "Profile 2",
+                "visible": true
+            },
+            {
+                "id": "profile3",
+                "name": "Profile 3",
+                "visible": true
+            },
+            {
+                "id": "profile4",
+                "name": "Profile 4",
+                "visible": true
+            },
+            {
+                "id": "profile5",
+                "name": "Profile 5",
+                "visible": true
+            }
+        ]
+    }"#;
+
+    with_temp_dir(valid_settings, valid_profiles, || {
+        let result = validate_config_files();
+        assert!(result.is_ok(), "Five visible profiles should be valid");
+    });
+}
+
+#[test]
+fn test_visible_profiles_exceeds_limit() {
+    let valid_settings = r#"{
+        "whisper": {
+            "api_key": "sk-test123"
+        }
+    }"#;
+
+    let invalid_profiles = r#"{
+        "profiles": [
+            {
+                "id": "profile1",
+                "name": "Profile 1",
+                "visible": true
+            },
+            {
+                "id": "profile2",
+                "name": "Profile 2",
+                "visible": true
+            },
+            {
+                "id": "profile3",
+                "name": "Profile 3",
+                "visible": true
+            },
+            {
+                "id": "profile4",
+                "name": "Profile 4",
+                "visible": true
+            },
+            {
+                "id": "profile5",
+                "name": "Profile 5",
+                "visible": true
+            },
+            {
+                "id": "profile6",
+                "name": "Profile 6",
+                "visible": true
+            }
+        ]
+    }"#;
+
+    with_temp_dir(valid_settings, invalid_profiles, || {
+        let result = validate_config_files();
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ConfigError::MaxVisibleProfilesExceeded => {}
+            other => panic!(
+                "Expected MaxVisibleProfilesExceeded error, got: {:?}",
+                other
+            ),
+        }
+    });
+}
