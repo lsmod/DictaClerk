@@ -4,9 +4,11 @@ pub mod config;
 pub mod services;
 
 use commands::{
-    encode_wav_to_ogg, get_encoder_info, get_whisper_info, init_audio_capture, init_whisper_client,
-    is_recording, is_whisper_initialized, start_capture, stop_capture, subscribe_rms,
-    transcribe_audio, transcribe_recorded_audio, AudioCaptureState, WhisperClientState,
+    auto_init_shortcut_mgr, encode_wav_to_ogg, get_encoder_info, get_shortcut_status,
+    get_whisper_info, init_audio_capture, init_shortcut_mgr, init_whisper_client, is_recording,
+    is_whisper_initialized, register_global_shortcut, start_capture, stop_capture, subscribe_rms,
+    toggle_record, transcribe_audio, transcribe_recorded_audio, unregister_global_shortcut,
+    update_global_shortcut, AudioCaptureState, ShortcutMgrState, WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -28,8 +30,10 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(Arc::new(Mutex::new(None)) as AudioCaptureState)
         .manage(Arc::new(Mutex::new(None)) as WhisperClientState)
+        .manage(Arc::new(Mutex::new(None)) as ShortcutMgrState)
         .invoke_handler(tauri::generate_handler![
             greet,
             init_audio_capture,
@@ -43,7 +47,14 @@ pub fn run() {
             transcribe_audio,
             transcribe_recorded_audio,
             get_whisper_info,
-            is_whisper_initialized
+            is_whisper_initialized,
+            init_shortcut_mgr,
+            auto_init_shortcut_mgr,
+            toggle_record,
+            get_shortcut_status,
+            register_global_shortcut,
+            unregister_global_shortcut,
+            update_global_shortcut
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

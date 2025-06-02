@@ -143,6 +143,12 @@ const SETTINGS_SCHEMA: &str = r#"{
         }
       },
       "additionalProperties": false
+    },
+    "global_shortcut": {
+      "type": "string",
+      "minLength": 1,
+      "default": "CmdOrCtrl+Shift+R",
+      "description": "Global keyboard shortcut for toggling recording"
     }
   },
   "required": ["whisper"],

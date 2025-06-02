@@ -18,5 +18,6 @@
   "ui": {
     "theme": "auto",
     "auto_start_recording": false
-  }
+  },
+  "global_shortcut": "CmdOrCtrl+Shift+R"
 }

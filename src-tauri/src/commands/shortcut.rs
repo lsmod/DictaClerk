@@ -1,0 +1,226 @@
+//! Shortcut-related commands for managing global keyboard shortcuts
+
+use crate::audio::capture::AudioCapture;
+use crate::commands::AudioCaptureState;
+use crate::services::{ShortcutMgr, ShortcutMgrConfig};
+use std::sync::Arc;
+use tauri::{AppHandle, State};
+use tokio::sync::Mutex;
+
+/// Global state for the shortcut manager
+pub type ShortcutMgrState = Arc<Mutex<Option<Arc<ShortcutMgr>>>>;
+
+/// Load global shortcut from settings.json
+fn load_global_shortcut_from_settings() -> String {
+    let settings_paths = vec!["settings.json", "../settings.json", "../../settings.json"];
+
+    for path in &settings_paths {
+        if std::path::Path::new(path).exists() {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(shortcut) = json.get("global_shortcut").and_then(|v| v.as_str()) {
+                        return shortcut.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    // Try current directory approach
+    if let Ok(current_dir) = std::env::current_dir() {
+        let settings_in_current = current_dir.join("settings.json");
+        if settings_in_current.exists() {
+            if let Ok(content) = std::fs::read_to_string(&settings_in_current) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(shortcut) = json.get("global_shortcut").and_then(|v| v.as_str()) {
+                        return shortcut.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    // Default shortcut
+    "CmdOrCtrl+Shift+R".to_string()
+}
+
+/// Initialize the shortcut manager
+#[tauri::command]
+pub async fn init_shortcut_mgr(
+    app_handle: AppHandle,
+    global_shortcut: Option<String>,
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let shortcut = global_shortcut.unwrap_or_else(load_global_shortcut_from_settings);
+
+    let config = ShortcutMgrConfig {
+        global_shortcut: shortcut.clone(),
+        show_error_toasts: true,
+    };
+
+    let mgr = Arc::new(ShortcutMgr::new(app_handle, config));
+
+    // Register the shortcut immediately
+    if let Err(e) = mgr.register_hotkey().await {
+        return Err(format!(
+            "Failed to register global shortcut '{}': {}",
+            shortcut, e
+        ));
+    }
+
+    let mut state_guard = state.lock().await;
+    *state_guard = Some(mgr);
+
+    Ok(format!(
+        "Shortcut manager initialized with shortcut: {}",
+        shortcut
+    ))
+}
+
+/// Auto-initialize shortcut manager during app startup
+#[tauri::command]
+pub async fn auto_init_shortcut_mgr(
+    app_handle: AppHandle,
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    init_shortcut_mgr(app_handle, None, state).await
+}
+
+/// Toggle recording state - this is called by the global shortcut
+#[tauri::command]
+pub async fn toggle_record(audio_state: State<'_, AudioCaptureState>) -> Result<String, String> {
+    let state_guard = audio_state.lock().await;
+
+    if let Some(ref capture) = *state_guard {
+        let is_currently_recording = capture.is_recording();
+
+        if is_currently_recording {
+            // Stop recording
+            let path = capture
+                .stop_capture()
+                .await
+                .map_err(|e| format!("Failed to stop capture: {}", e))?;
+
+            Ok(format!(
+                "Recording stopped. File saved: {}",
+                path.to_string_lossy()
+            ))
+        } else {
+            // Start recording
+            let path = capture
+                .start_capture()
+                .await
+                .map_err(|e| format!("Failed to start capture: {}", e))?;
+
+            Ok(format!(
+                "Recording started. Temp file: {}",
+                path.to_string_lossy()
+            ))
+        }
+    } else {
+        Err("Audio capture not initialized".to_string())
+    }
+}
+
+/// Get shortcut manager status
+#[tauri::command]
+pub async fn get_shortcut_status(
+    state: State<'_, ShortcutMgrState>,
+) -> Result<serde_json::Value, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        let is_registered = mgr.is_registered().await;
+        let shortcut = mgr.get_shortcut();
+
+        Ok(serde_json::json!({
+            "initialized": true,
+            "registered": is_registered,
+            "shortcut": shortcut,
+            "status": if is_registered { "active" } else { "inactive" }
+        }))
+    } else {
+        Ok(serde_json::json!({
+            "initialized": false,
+            "registered": false,
+            "shortcut": null,
+            "status": "not_initialized"
+        }))
+    }
+}
+
+/// Register global shortcut
+#[tauri::command]
+pub async fn register_global_shortcut(
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        mgr.register_hotkey()
+            .await
+            .map_err(|e| format!("Failed to register shortcut: {}", e))?;
+
+        Ok(format!(
+            "Global shortcut '{}' registered successfully",
+            mgr.get_shortcut()
+        ))
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
+
+/// Unregister global shortcut
+#[tauri::command]
+pub async fn unregister_global_shortcut(
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        mgr.unregister()
+            .await
+            .map_err(|e| format!("Failed to unregister shortcut: {}", e))?;
+
+        Ok("Global shortcut unregistered successfully".to_string())
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
+
+/// Update global shortcut
+#[tauri::command]
+pub async fn update_global_shortcut(
+    new_shortcut: String,
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let mut state_guard = state.lock().await;
+
+    if let Some(ref mgr) = state_guard.clone() {
+        // Create a new manager with the updated shortcut
+        let config = ShortcutMgrConfig {
+            global_shortcut: new_shortcut.clone(),
+            show_error_toasts: true,
+        };
+
+        // Unregister the old shortcut
+        if let Err(e) = mgr.unregister().await {
+            eprintln!("Warning: Failed to unregister old shortcut: {}", e);
+        }
+
+        // Create new manager and register new shortcut
+        let new_mgr = Arc::new(ShortcutMgr::new(mgr.get_app_handle().clone(), config));
+
+        new_mgr
+            .register_hotkey()
+            .await
+            .map_err(|e| format!("Failed to register new shortcut: {}", e))?;
+
+        // Update the state
+        *state_guard = Some(new_mgr);
+
+        Ok(format!("Global shortcut updated to '{}'", new_shortcut))
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
