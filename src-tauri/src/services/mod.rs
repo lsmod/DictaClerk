@@ -8,7 +8,10 @@ pub mod whisper_client;
 pub use clipboard_svc::{
     ClipboardError, ClipboardResult, ClipboardService, MockClipboardService, TauriClipboardService,
 };
-pub use notifier::{NotificationLevel, Notifier, StubNotifier};
+pub use notifier::{
+    MockNotifierService, NotificationLevel, Notifier, NotifierError, NotifierResult,
+    TauriNotifierService,
+};
 pub use profile_engine::{
     Profile, ProfileCollection, ProfileEngine, ProfileEngineConfig, ProfileError, ProfileResult,
 };

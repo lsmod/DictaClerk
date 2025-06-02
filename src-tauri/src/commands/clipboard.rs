@@ -1,5 +1,5 @@
 use crate::services::{
-    ClipboardError, ClipboardService, Notifier, StubNotifier, TauriClipboardService,
+    ClipboardError, ClipboardService, MockNotifierService, Notifier, TauriClipboardService,
 };
 use std::sync::Arc;
 use tauri::State;
@@ -42,7 +42,7 @@ pub async fn copy_to_clipboard(
                 let error_msg = format_clipboard_error(&clipboard_error);
 
                 // Send toast error notification as per requirements
-                let notifier = StubNotifier::new();
+                let notifier = MockNotifierService::new();
                 if let Err(notify_err) = notifier.error(&error_msg).await {
                     eprintln!("Failed to send error notification: {}", notify_err);
                 }
@@ -54,7 +54,7 @@ pub async fn copy_to_clipboard(
         let error_msg = "Clipboard service not initialized. Call init_clipboard_service first.";
 
         // Send toast error notification
-        let notifier = StubNotifier::new();
+        let notifier = MockNotifierService::new();
         if let Err(notify_err) = notifier.error(error_msg).await {
             eprintln!("Failed to send error notification: {}", notify_err);
         }
