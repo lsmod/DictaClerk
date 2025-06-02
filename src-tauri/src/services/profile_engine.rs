@@ -17,6 +17,7 @@
 //!     example_input: Some("patient has fever".to_string()),
 //!     example_output: Some("Patient presents with fever.".to_string()),
 //!     active: true,
+//!     visible: Some(true),
 //!     created_at: "2025-01-01T00:00:00Z".to_string(),
 //!     updated_at: "2025-01-01T00:00:00Z".to_string(),
 //! };

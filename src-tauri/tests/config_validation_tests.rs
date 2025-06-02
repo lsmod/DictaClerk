@@ -3,9 +3,11 @@
 //! These tests validate the config validation system against real files
 //! and ensure proper error handling and coverage.
 
-use dicta_clerk_lib::config::{validate_config_files_strict as validate_config_files, ConfigError};
-use std::env;
-use std::fs;
+use dicta_clerk_lib::config::validator::{
+    validate_config_files_strict as validate_config_files, ConfigError,
+};
+use serial_test::serial;
+use std::{env, fs};
 use tempfile::TempDir;
 
 fn create_test_environment_with_files(
@@ -41,6 +43,7 @@ where
 }
 
 #[test]
+#[serial]
 fn test_valid_configuration_files() {
     let valid_settings = r#"{
         "whisper": {
@@ -64,6 +67,7 @@ fn test_valid_configuration_files() {
 }
 
 #[test]
+#[serial]
 fn test_missing_settings_file() {
     let temp_dir = TempDir::new().unwrap();
     let original_dir = env::current_dir().unwrap();
@@ -89,6 +93,7 @@ fn test_missing_settings_file() {
 }
 
 #[test]
+#[serial]
 fn test_missing_profiles_file() {
     let temp_dir = TempDir::new().unwrap();
     let original_dir = env::current_dir().unwrap();
@@ -118,6 +123,7 @@ fn test_missing_profiles_file() {
 }
 
 #[test]
+#[serial]
 fn test_malformed_settings_json() {
     let malformed_settings = r#"{
         "whisper": {
@@ -141,6 +147,7 @@ fn test_malformed_settings_json() {
 }
 
 #[test]
+#[serial]
 fn test_settings_validation_missing_required_field() {
     let invalid_settings = r#"{
         "whisper": {}
@@ -167,6 +174,7 @@ fn test_settings_validation_missing_required_field() {
 }
 
 #[test]
+#[serial]
 fn test_profiles_incomplete_example() {
     let valid_settings = r#"{
         "whisper": {
@@ -196,6 +204,7 @@ fn test_profiles_incomplete_example() {
 }
 
 #[test]
+#[serial]
 fn test_profiles_complete_example() {
     let valid_settings = r#"{
         "whisper": {
@@ -221,6 +230,7 @@ fn test_profiles_complete_example() {
 }
 
 #[test]
+#[serial]
 fn test_profiles_with_null_examples() {
     let valid_settings = r#"{
         "whisper": {
@@ -246,6 +256,7 @@ fn test_profiles_with_null_examples() {
 }
 
 #[test]
+#[serial]
 fn test_settings_with_all_optional_fields() {
     let comprehensive_settings = r#"{
         "whisper": {
@@ -279,6 +290,7 @@ fn test_settings_with_all_optional_fields() {
 }
 
 #[test]
+#[serial]
 fn test_settings_invalid_values() {
     let invalid_settings = r#"{
         "whisper": {
@@ -307,6 +319,7 @@ fn test_settings_invalid_values() {
 }
 
 #[test]
+#[serial]
 fn test_visible_profiles_within_limit() {
     let valid_settings = r#"{
         "whisper": {
@@ -353,6 +366,7 @@ fn test_visible_profiles_within_limit() {
 }
 
 #[test]
+#[serial]
 fn test_visible_profiles_at_limit() {
     let valid_settings = r#"{
         "whisper": {
@@ -397,6 +411,7 @@ fn test_visible_profiles_at_limit() {
 }
 
 #[test]
+#[serial]
 fn test_visible_profiles_exceeds_limit() {
     let valid_settings = r#"{
         "whisper": {
