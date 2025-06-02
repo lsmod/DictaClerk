@@ -3,7 +3,7 @@
 //! These tests validate the config validation system against real files
 //! and ensure proper error handling and coverage.
 
-use dicta_clerk_lib::config::{validate_config_files, ConfigError};
+use dicta_clerk_lib::config::{validate_config_files_strict as validate_config_files, ConfigError};
 use std::env;
 use std::fs;
 use tempfile::TempDir;

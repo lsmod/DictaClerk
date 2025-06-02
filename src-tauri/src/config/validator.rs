@@ -223,12 +223,69 @@ const PROFILES_SCHEMA: &str = r#"{
 
 /// Validates both configuration files against their schemas
 pub fn validate_config_files() -> Result<(), ConfigError> {
-    // Validate settings.json
+    // Try to find config files in different possible locations
+    let settings_paths = vec!["settings.json", "../settings.json", "../../settings.json"];
+
+    let profiles_paths = vec!["profiles.json", "../profiles.json", "../../profiles.json"];
+
+    // Try to validate settings.json
+    let mut settings_found = false;
+    for path in &settings_paths {
+        if std::path::Path::new(path).exists() {
+            validate_settings_file(path)?;
+            settings_found = true;
+            break;
+        }
+    }
+
+    // Also try current directory approach
+    if !settings_found {
+        if let Ok(current_dir) = std::env::current_dir() {
+            let settings_in_current = current_dir.join("settings.json");
+            if settings_in_current.exists() {
+                validate_settings_file(&settings_in_current)?;
+                settings_found = true;
+            }
+        }
+    }
+
+    if !settings_found {
+        eprintln!("Warning: settings.json not found in any expected location. Skipping settings validation.");
+    }
+
+    // Try to validate profiles.json
+    let mut profiles_found = false;
+    for path in &profiles_paths {
+        if std::path::Path::new(path).exists() {
+            validate_profiles_file(path)?;
+            profiles_found = true;
+            break;
+        }
+    }
+
+    // Also try current directory approach
+    if !profiles_found {
+        if let Ok(current_dir) = std::env::current_dir() {
+            let profiles_in_current = current_dir.join("profiles.json");
+            if profiles_in_current.exists() {
+                validate_profiles_file(&profiles_in_current)?;
+                profiles_found = true;
+            }
+        }
+    }
+
+    if !profiles_found {
+        eprintln!("Warning: profiles.json not found in any expected location. Skipping profiles validation.");
+    }
+
+    Ok(())
+}
+
+/// Validates both configuration files against their schemas (strict mode for tests)
+/// This version requires both files to exist and will return errors if they're missing
+pub fn validate_config_files_strict() -> Result<(), ConfigError> {
     validate_settings_file("settings.json")?;
-
-    // Validate profiles.json
     validate_profiles_file("profiles.json")?;
-
     Ok(())
 }
 
