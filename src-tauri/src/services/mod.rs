@@ -1,9 +1,13 @@
+pub mod clipboard_svc;
 pub mod notifier;
 pub mod profile_engine;
 pub mod shortcut_mgr;
 pub mod size_guard;
 pub mod whisper_client;
 
+pub use clipboard_svc::{
+    ClipboardError, ClipboardResult, ClipboardService, MockClipboardService, TauriClipboardService,
+};
 pub use notifier::{NotificationLevel, Notifier, StubNotifier};
 pub use profile_engine::{
     Profile, ProfileCollection, ProfileEngine, ProfileEngineConfig, ProfileError, ProfileResult,

@@ -1,10 +1,15 @@
 pub mod audio;
+pub mod clipboard;
 pub mod encoder;
 pub mod shortcut;
 pub mod whisper;
 
 pub use audio::{
     init_audio_capture, is_recording, start_capture, stop_capture, subscribe_rms, AudioCaptureState,
+};
+pub use clipboard::{
+    copy_to_clipboard, get_clipboard_info, init_clipboard_service, is_clipboard_initialized,
+    ClipboardServiceState,
 };
 pub use encoder::{encode_wav_to_ogg, get_encoder_info};
 pub use shortcut::{

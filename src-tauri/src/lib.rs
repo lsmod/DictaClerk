@@ -4,13 +4,15 @@ pub mod config;
 pub mod services;
 
 use commands::{
-    auto_init_shortcut_mgr, check_shortcut_available, encode_wav_to_ogg, get_encoder_info,
-    get_shortcut_status, get_whisper_info, init_audio_capture, init_shortcut_mgr,
-    init_whisper_client, is_recording, is_whisper_initialized, register_all_profile_shortcuts,
+    auto_init_shortcut_mgr, check_shortcut_available, copy_to_clipboard, encode_wav_to_ogg,
+    get_clipboard_info, get_encoder_info, get_shortcut_status, get_whisper_info,
+    init_audio_capture, init_clipboard_service, init_shortcut_mgr, init_whisper_client,
+    is_clipboard_initialized, is_recording, is_whisper_initialized, register_all_profile_shortcuts,
     register_global_shortcut, register_profile_shortcut, start_capture, stop_capture,
     subscribe_rms, toggle_record, transcribe_audio, transcribe_recorded_audio,
     unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
-    update_global_shortcut, AudioCaptureState, ShortcutMgrState, WhisperClientState,
+    update_global_shortcut, AudioCaptureState, ClipboardServiceState, ShortcutMgrState,
+    WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -36,6 +38,7 @@ pub fn run() {
         .manage(Arc::new(Mutex::new(None)) as AudioCaptureState)
         .manage(Arc::new(Mutex::new(None)) as WhisperClientState)
         .manage(Arc::new(Mutex::new(None)) as ShortcutMgrState)
+        .manage(Arc::new(Mutex::new(None)) as ClipboardServiceState)
         .invoke_handler(tauri::generate_handler![
             greet,
             init_audio_capture,
@@ -61,7 +64,11 @@ pub fn run() {
             unregister_profile_shortcut,
             register_all_profile_shortcuts,
             unregister_all_profile_shortcuts,
-            check_shortcut_available
+            check_shortcut_available,
+            init_clipboard_service,
+            copy_to_clipboard,
+            is_clipboard_initialized,
+            get_clipboard_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
