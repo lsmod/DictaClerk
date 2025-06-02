@@ -38,6 +38,9 @@ pub enum ConfigError {
 
     #[error("Maximum five visible profiles")]
     MaxVisibleProfilesExceeded,
+
+    #[error("Shortcut conflict")]
+    ShortcutConflict,
 }
 
 /// Settings JSON Schema - defines application-wide settings
@@ -201,6 +204,10 @@ const PROFILES_SCHEMA: &str = r#"{
             "type": ["boolean", "null"],
             "default": false,
             "description": "Whether this profile is visible in the UI (max 5)"
+          },
+          "shortcut": {
+            "type": ["string", "null"],
+            "description": "Optional keyboard shortcut for quick profile selection"
           },
           "created_at": {
             "type": "string",
@@ -388,6 +395,9 @@ fn validate_profiles_file<P: AsRef<Path>>(path: P) -> Result<(), ConfigError> {
     // Additional validation: enforce visible profiles limit
     validate_visible_profiles_limit(&json)?;
 
+    // Additional validation: check for shortcut conflicts
+    validate_shortcut_conflicts(&json)?;
+
     Ok(())
 }
 
@@ -435,6 +445,28 @@ fn validate_visible_profiles_limit(json: &Value) -> Result<(), ConfigError> {
 
         if visible_count > 5 {
             return Err(ConfigError::MaxVisibleProfilesExceeded);
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates the shortcut conflicts
+fn validate_shortcut_conflicts(json: &Value) -> Result<(), ConfigError> {
+    if let Some(profiles) = json.get("profiles").and_then(|p| p.as_array()) {
+        let mut shortcuts_seen = std::collections::HashSet::new();
+
+        for profile in profiles {
+            if let Some(shortcut_value) = profile.get("shortcut") {
+                if let Some(shortcut) = shortcut_value.as_str() {
+                    if !shortcut.trim().is_empty() {
+                        if shortcuts_seen.contains(shortcut) {
+                            return Err(ConfigError::ShortcutConflict);
+                        }
+                        shortcuts_seen.insert(shortcut);
+                    }
+                }
+            }
         }
     }
 
@@ -718,6 +750,96 @@ mod tests {
                     "id": "profile3",
                     "name": "Profile 3",
                     "visible": null
+                },
+                {
+                    "id": "profile4",
+                    "name": "Profile 4"
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, valid_profiles).unwrap();
+
+        assert!(validate_profiles_file(&profiles_path).is_ok());
+    }
+
+    #[test]
+    fn test_shortcut_no_conflicts() {
+        let valid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "shortcut": "Ctrl+Alt+1"
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "shortcut": "Ctrl+Alt+2"
+                },
+                {
+                    "id": "profile3",
+                    "name": "Profile 3"
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, valid_profiles).unwrap();
+
+        assert!(validate_profiles_file(&profiles_path).is_ok());
+    }
+
+    #[test]
+    fn test_shortcut_conflicts() {
+        let invalid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "shortcut": "Ctrl+Alt+1"
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "shortcut": "Ctrl+Alt+1"
+                }
+            ]
+        }"#;
+
+        let temp_dir = TempDir::new().unwrap();
+        let profiles_path = temp_dir.path().join("profiles.json");
+        fs::write(&profiles_path, invalid_profiles).unwrap();
+
+        let result = validate_profiles_file(&profiles_path);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::ShortcutConflict => {}
+            other => panic!("Expected ShortcutConflict error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_shortcut_empty_shortcuts_ignored() {
+        let valid_profiles = r#"{
+            "profiles": [
+                {
+                    "id": "profile1",
+                    "name": "Profile 1",
+                    "shortcut": ""
+                },
+                {
+                    "id": "profile2",
+                    "name": "Profile 2",
+                    "shortcut": "   "
+                },
+                {
+                    "id": "profile3",
+                    "name": "Profile 3",
+                    "shortcut": null
                 },
                 {
                     "id": "profile4",

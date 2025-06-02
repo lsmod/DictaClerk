@@ -4,10 +4,12 @@ pub mod config;
 pub mod services;
 
 use commands::{
-    auto_init_shortcut_mgr, encode_wav_to_ogg, get_encoder_info, get_shortcut_status,
-    get_whisper_info, init_audio_capture, init_shortcut_mgr, init_whisper_client, is_recording,
-    is_whisper_initialized, register_global_shortcut, start_capture, stop_capture, subscribe_rms,
-    toggle_record, transcribe_audio, transcribe_recorded_audio, unregister_global_shortcut,
+    auto_init_shortcut_mgr, check_shortcut_available, encode_wav_to_ogg, get_encoder_info,
+    get_shortcut_status, get_whisper_info, init_audio_capture, init_shortcut_mgr,
+    init_whisper_client, is_recording, is_whisper_initialized, register_all_profile_shortcuts,
+    register_global_shortcut, register_profile_shortcut, start_capture, stop_capture,
+    subscribe_rms, toggle_record, transcribe_audio, transcribe_recorded_audio,
+    unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
     update_global_shortcut, AudioCaptureState, ShortcutMgrState, WhisperClientState,
 };
 use config::validate_config_files;
@@ -54,7 +56,12 @@ pub fn run() {
             get_shortcut_status,
             register_global_shortcut,
             unregister_global_shortcut,
-            update_global_shortcut
+            update_global_shortcut,
+            register_profile_shortcut,
+            unregister_profile_shortcut,
+            register_all_profile_shortcuts,
+            unregister_all_profile_shortcuts,
+            check_shortcut_available
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

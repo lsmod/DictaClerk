@@ -224,3 +224,137 @@ pub async fn update_global_shortcut(
         Err("Shortcut manager not initialized".to_string())
     }
 }
+
+/// Register a profile shortcut
+#[tauri::command]
+pub async fn register_profile_shortcut(
+    profile_id: String,
+    shortcut: String,
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        mgr.register_profile_shortcut(profile_id.clone(), shortcut.clone())
+            .await
+            .map_err(|e| format!("Failed to register profile shortcut: {}", e))?;
+
+        Ok(format!(
+            "Profile shortcut '{}' registered for profile '{}'",
+            shortcut, profile_id
+        ))
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
+
+/// Unregister a profile shortcut
+#[tauri::command]
+pub async fn unregister_profile_shortcut(
+    profile_id: String,
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        mgr.unregister_profile_shortcut(&profile_id)
+            .await
+            .map_err(|e| format!("Failed to unregister profile shortcut: {}", e))?;
+
+        Ok(format!(
+            "Profile shortcut unregistered for profile '{}'",
+            profile_id
+        ))
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
+
+/// Register all profile shortcuts from profiles.json
+#[tauri::command]
+pub async fn register_all_profile_shortcuts(
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        // Load profiles from profiles.json
+        let profiles_content = load_profiles_json()?;
+        let profile_engine = crate::services::ProfileEngine::new();
+        let profiles = profile_engine
+            .load_profiles_from_json(&profiles_content)
+            .map_err(|e| format!("Failed to parse profiles: {}", e))?;
+
+        mgr.register_profile_shortcuts(&profiles)
+            .await
+            .map_err(|e| format!("Failed to register profile shortcuts: {}", e))?;
+
+        let shortcut_count = profiles
+            .profiles
+            .iter()
+            .filter(|p| p.shortcut.is_some() && !p.shortcut.as_ref().unwrap().trim().is_empty())
+            .count();
+
+        Ok(format!("Registered {} profile shortcuts", shortcut_count))
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
+
+/// Unregister all profile shortcuts
+#[tauri::command]
+pub async fn unregister_all_profile_shortcuts(
+    state: State<'_, ShortcutMgrState>,
+) -> Result<String, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        mgr.unregister_all_profile_shortcuts()
+            .await
+            .map_err(|e| format!("Failed to unregister profile shortcuts: {}", e))?;
+
+        Ok("All profile shortcuts unregistered".to_string())
+    } else {
+        Err("Shortcut manager not initialized".to_string())
+    }
+}
+
+/// Check if a shortcut is available (not conflicting)
+#[tauri::command]
+pub async fn check_shortcut_available(
+    shortcut: String,
+    state: State<'_, ShortcutMgrState>,
+) -> Result<bool, String> {
+    let state_guard = state.lock().await;
+
+    if let Some(ref mgr) = *state_guard {
+        let is_registered = mgr.is_shortcut_registered(&shortcut).await;
+        Ok(!is_registered)
+    } else {
+        // If shortcut manager is not initialized, we can't check conflicts
+        Ok(true)
+    }
+}
+
+/// Helper function to load profiles.json content
+fn load_profiles_json() -> Result<String, String> {
+    let profiles_paths = vec!["profiles.json", "../profiles.json", "../../profiles.json"];
+
+    for path in &profiles_paths {
+        if std::path::Path::new(path).exists() {
+            return std::fs::read_to_string(path)
+                .map_err(|e| format!("Failed to read profiles.json: {}", e));
+        }
+    }
+
+    // Try current directory approach
+    if let Ok(current_dir) = std::env::current_dir() {
+        let profiles_in_current = current_dir.join("profiles.json");
+        if profiles_in_current.exists() {
+            return std::fs::read_to_string(&profiles_in_current)
+                .map_err(|e| format!("Failed to read profiles.json: {}", e));
+        }
+    }
+
+    Err("profiles.json not found".to_string())
+}

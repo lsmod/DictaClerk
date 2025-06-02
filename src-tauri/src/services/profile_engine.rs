@@ -18,6 +18,7 @@
 //!     example_output: Some("Patient presents with fever.".to_string()),
 //!     active: true,
 //!     visible: Some(true),
+//!     shortcut: Some("Ctrl+Alt+M".to_string()),
 //!     created_at: "2025-01-01T00:00:00Z".to_string(),
 //!     updated_at: "2025-01-01T00:00:00Z".to_string(),
 //! };
@@ -66,6 +67,8 @@ pub struct Profile {
     pub active: bool,
     /// Whether this profile is visible in the UI (max 5)
     pub visible: Option<bool>,
+    /// Optional keyboard shortcut for quick profile selection
+    pub shortcut: Option<String>,
     /// Profile creation timestamp
     pub created_at: String,
     /// Profile last update timestamp
@@ -103,6 +106,9 @@ pub enum ProfileError {
 
     #[error("Maximum five visible profiles")]
     MaxVisibleProfilesExceeded,
+
+    #[error("Shortcut conflict")]
+    ShortcutConflict,
 }
 
 /// Result type for profile operations
@@ -301,6 +307,36 @@ impl ProfileEngine {
 
         Ok(())
     }
+
+    /// Validate shortcut conflicts within a profile collection and against global shortcut
+    pub fn validate_shortcut_conflicts(
+        &self,
+        profiles: &ProfileCollection,
+        global_shortcut: Option<&str>,
+    ) -> ProfileResult<()> {
+        let mut shortcuts_seen = std::collections::HashSet::new();
+
+        // Add global shortcut to the set if provided
+        if let Some(global) = global_shortcut {
+            if !global.trim().is_empty() {
+                shortcuts_seen.insert(global.to_string());
+            }
+        }
+
+        // Check for conflicts within profiles
+        for profile in &profiles.profiles {
+            if let Some(ref shortcut) = profile.shortcut {
+                if !shortcut.trim().is_empty() {
+                    if shortcuts_seen.contains(shortcut) {
+                        return Err(ProfileError::ShortcutConflict);
+                    }
+                    shortcuts_seen.insert(shortcut.clone());
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Default for ProfileEngine {
@@ -323,6 +359,7 @@ mod tests {
             example_output: None,
             active: true,
             visible: None,
+            shortcut: None,
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),
         }
@@ -338,6 +375,7 @@ mod tests {
             example_output: None,
             active: true,
             visible: None,
+            shortcut: None,
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),
         }
@@ -353,6 +391,7 @@ mod tests {
             example_output: Some("Patient presents with fever.".to_string()),
             active: true,
             visible: None,
+            shortcut: None,
             created_at: "2025-01-01T00:00:00Z".to_string(),
             updated_at: "2025-01-01T00:00:00Z".to_string(),
         }
@@ -676,5 +715,95 @@ mod tests {
         };
 
         assert!(engine.validate_profiles_collection(&profiles).is_ok());
+    }
+
+    #[test]
+    fn test_profile_with_shortcut() {
+        let mut profile = create_test_profile();
+        profile.shortcut = Some("Ctrl+Alt+1".to_string());
+
+        assert_eq!(profile.shortcut, Some("Ctrl+Alt+1".to_string()));
+    }
+
+    #[test]
+    fn test_validate_shortcut_conflicts_no_conflicts() {
+        let engine = ProfileEngine::new();
+        let mut profile1 = create_test_profile();
+        profile1.id = "profile1".to_string();
+        profile1.shortcut = Some("Ctrl+Alt+1".to_string());
+
+        let mut profile2 = create_test_profile();
+        profile2.id = "profile2".to_string();
+        profile2.shortcut = Some("Ctrl+Alt+2".to_string());
+
+        let profiles = ProfileCollection {
+            profiles: vec![profile1, profile2],
+            default_profile_id: "profile1".to_string(),
+        };
+
+        assert!(engine
+            .validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"))
+            .is_ok());
+    }
+
+    #[test]
+    fn test_validate_shortcut_conflicts_profile_conflict() {
+        let engine = ProfileEngine::new();
+        let mut profile1 = create_test_profile();
+        profile1.id = "profile1".to_string();
+        profile1.shortcut = Some("Ctrl+Alt+1".to_string());
+
+        let mut profile2 = create_test_profile();
+        profile2.id = "profile2".to_string();
+        profile2.shortcut = Some("Ctrl+Alt+1".to_string()); // Same shortcut
+
+        let profiles = ProfileCollection {
+            profiles: vec![profile1, profile2],
+            default_profile_id: "profile1".to_string(),
+        };
+
+        let result = engine.validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"));
+        assert!(matches!(result, Err(ProfileError::ShortcutConflict)));
+    }
+
+    #[test]
+    fn test_validate_shortcut_conflicts_global_conflict() {
+        let engine = ProfileEngine::new();
+        let mut profile1 = create_test_profile();
+        profile1.id = "profile1".to_string();
+        profile1.shortcut = Some("Ctrl+Shift+R".to_string()); // Same as global
+
+        let profiles = ProfileCollection {
+            profiles: vec![profile1],
+            default_profile_id: "profile1".to_string(),
+        };
+
+        let result = engine.validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"));
+        assert!(matches!(result, Err(ProfileError::ShortcutConflict)));
+    }
+
+    #[test]
+    fn test_validate_shortcut_conflicts_empty_shortcuts_ignored() {
+        let engine = ProfileEngine::new();
+        let mut profile1 = create_test_profile();
+        profile1.id = "profile1".to_string();
+        profile1.shortcut = Some("".to_string()); // Empty shortcut
+
+        let mut profile2 = create_test_profile();
+        profile2.id = "profile2".to_string();
+        profile2.shortcut = Some("   ".to_string()); // Whitespace only
+
+        let mut profile3 = create_test_profile();
+        profile3.id = "profile3".to_string();
+        profile3.shortcut = None; // No shortcut
+
+        let profiles = ProfileCollection {
+            profiles: vec![profile1, profile2, profile3],
+            default_profile_id: "profile1".to_string(),
+        };
+
+        assert!(engine
+            .validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"))
+            .is_ok());
     }
 }
