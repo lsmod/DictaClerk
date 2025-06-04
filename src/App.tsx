@@ -6,6 +6,7 @@ import ProfileButtons from './components/ProfileButtons'
 import ElapsedTime from './components/ElapsedTime'
 import VolumeVisualizer from './components/VolumeVisualizer'
 import SettingsButton from './components/SettingsButton'
+import { invoke } from '@tauri-apps/api/core'
 
 function App() {
   const { initializeTray, updateTrayStatus, hideWindow } = useSystemTray()
@@ -20,9 +21,25 @@ function App() {
 
         await initializeTray({
           showStartupNotification: !isFirstLaunch,
-          globalShortcut: 'CmdOrCtrl+Shift+R',
+          globalShortcut: 'CmdOrCtrl+Shift+F9',
           isFirstLaunch,
         })
+
+        // Initialize shortcut manager after tray is set up
+        try {
+          await invoke('auto_init_shortcut_mgr')
+          console.log('Shortcut manager initialized')
+
+          // Debug: Check shortcut status
+          try {
+            const status = await invoke('get_shortcut_status')
+            console.log('Shortcut status:', status)
+          } catch (statusError) {
+            console.error('Failed to get shortcut status:', statusError)
+          }
+        } catch (error) {
+          console.error('Failed to initialize shortcut manager:', error)
+        }
 
         // Mark as not first launch anymore
         if (isFirstLaunch) {
@@ -54,10 +71,28 @@ function App() {
       window.dispatchEvent(new CustomEvent('stop-recording'))
     }
 
-    const handleTrayToggleRecord = () => {
+    const handleTrayToggleRecord = async () => {
       console.log('Toggling recording from tray')
-      // Emit event to toggle recording in the existing components
-      window.dispatchEvent(new CustomEvent('toggle-recording'))
+      try {
+        // Call the backend toggle_record_with_tray command directly
+        const result = await invoke('toggle_record_with_tray')
+        console.log('Toggle record result:', result)
+
+        // Update UI based on the result
+        if (
+          typeof result === 'string' &&
+          result.includes('Recording started')
+        ) {
+          updateTrayStatus('Recording')
+        } else if (
+          typeof result === 'string' &&
+          result.includes('Recording stopped')
+        ) {
+          updateTrayStatus('Ready')
+        }
+      } catch (error) {
+        console.error('Failed to toggle recording:', error)
+      }
     }
 
     const handleTrayShowSettings = () => {

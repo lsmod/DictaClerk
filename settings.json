@@ -19,5 +19,5 @@
     "theme": "auto",
     "auto_start_recording": false
   },
-  "global_shortcut": "Ctrl+Shift+F12"
+  "global_shortcut": "CmdOrCtrl+Shift+F9"
 }
