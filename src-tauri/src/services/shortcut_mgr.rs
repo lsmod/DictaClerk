@@ -101,15 +101,15 @@ impl ShortcutMgr {
         let registration_result = self.app_handle.global_shortcut().on_shortcut(
             shortcut,
             move |_app_handle, _shortcut, _event| {
-                // Emit toggleRecord event when shortcut is pressed
+                // Emit toggleRecordWithTray event when shortcut is pressed for tray integration
                 if let Err(e) = app_handle.emit(
-                    "toggleRecord",
+                    "toggleRecordWithTray",
                     ShortcutEvent {
                         shortcut: shortcut_str_clone.clone(),
                         action: "toggle".to_string(),
                     },
                 ) {
-                    eprintln!("Failed to emit toggleRecord event: {}", e);
+                    eprintln!("Failed to emit toggleRecordWithTray event: {}", e);
                 }
             },
         );

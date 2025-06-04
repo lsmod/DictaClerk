@@ -3,6 +3,7 @@ pub mod notifier;
 pub mod profile_engine;
 pub mod shortcut_mgr;
 pub mod size_guard;
+pub mod system_tray;
 pub mod whisper_client;
 
 pub use clipboard_svc::{
@@ -19,6 +20,9 @@ pub use shortcut_mgr::{
     ShortcutError, ShortcutEvent, ShortcutMgr, ShortcutMgrConfig, ShortcutResult,
 };
 pub use size_guard::{SizeGuard, SizeGuardConfig, SizeGuardError};
+pub use system_tray::{
+    SystemTrayConfig, SystemTrayError, SystemTrayResult, SystemTrayService, WindowState,
+};
 pub use whisper_client::{
     OpenAIWhisperClient, TranscriptionResponse, TranscriptionSegment, WhisperClient,
     WhisperClientConfig, WhisperError, WhisperResult,

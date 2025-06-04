@@ -6,13 +6,16 @@ pub mod services;
 use commands::{
     auto_init_shortcut_mgr, check_shortcut_available, copy_to_clipboard, encode_wav_to_ogg,
     get_clipboard_info, get_encoder_info, get_shortcut_status, get_whisper_info,
-    init_audio_capture, init_clipboard_service, init_shortcut_mgr, init_whisper_client,
-    is_clipboard_initialized, is_recording, is_whisper_initialized, register_all_profile_shortcuts,
-    register_global_shortcut, register_profile_shortcut, start_capture, stop_capture,
-    subscribe_rms, toggle_record, transcribe_audio, transcribe_recorded_audio,
-    unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
-    update_global_shortcut, AudioCaptureState, ClipboardServiceState, ShortcutMgrState,
-    WhisperClientState,
+    handle_window_close, hide_main_window, init_audio_capture, init_clipboard_service,
+    init_shortcut_mgr, init_system_tray, init_whisper_client, is_clipboard_initialized,
+    is_recording, is_whisper_initialized, is_window_hidden, register_all_profile_shortcuts,
+    register_global_shortcut, register_profile_shortcut, show_main_window,
+    show_window_and_start_recording, start_capture, stop_capture, subscribe_rms,
+    toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
+    transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
+    unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
+    update_tray_status, AudioCaptureState, ClipboardServiceState, ShortcutMgrState,
+    SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -35,10 +38,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(Arc::new(Mutex::new(None)) as AudioCaptureState)
         .manage(Arc::new(Mutex::new(None)) as WhisperClientState)
         .manage(Arc::new(Mutex::new(None)) as ShortcutMgrState)
         .manage(Arc::new(Mutex::new(None)) as ClipboardServiceState)
+        .manage(Arc::new(Mutex::new(None)) as SystemTrayState)
         .invoke_handler(tauri::generate_handler![
             greet,
             init_audio_capture,
@@ -56,6 +61,7 @@ pub fn run() {
             init_shortcut_mgr,
             auto_init_shortcut_mgr,
             toggle_record,
+            toggle_record_with_tray,
             get_shortcut_status,
             register_global_shortcut,
             unregister_global_shortcut,
@@ -68,7 +74,16 @@ pub fn run() {
             init_clipboard_service,
             copy_to_clipboard,
             is_clipboard_initialized,
-            get_clipboard_info
+            get_clipboard_info,
+            init_system_tray,
+            show_main_window,
+            hide_main_window,
+            toggle_main_window,
+            show_window_and_start_recording,
+            handle_window_close,
+            update_tray_status,
+            is_window_hidden,
+            update_tray_global_shortcut
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

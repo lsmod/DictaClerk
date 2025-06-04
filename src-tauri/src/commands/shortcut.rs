@@ -1,7 +1,7 @@
 //! Shortcut-related commands for managing global keyboard shortcuts
 
 use crate::audio::capture::AudioCapture;
-use crate::commands::AudioCaptureState;
+use crate::commands::{AudioCaptureState, SystemTrayState};
 use crate::services::{ShortcutMgr, ShortcutMgrConfig};
 use std::sync::Arc;
 use tauri::{AppHandle, State};
@@ -86,7 +86,85 @@ pub async fn auto_init_shortcut_mgr(
     init_shortcut_mgr(app_handle, None, state).await
 }
 
-/// Toggle recording state - this is called by the global shortcut
+/// Toggle recording state with system tray integration - this is called by the global shortcut
+#[tauri::command]
+pub async fn toggle_record_with_tray(
+    audio_state: State<'_, AudioCaptureState>,
+    tray_state: State<'_, SystemTrayState>,
+) -> Result<String, String> {
+    // First check if window is hidden
+    let is_window_hidden = {
+        let tray_guard = tray_state.lock().await;
+        if let Some(ref service) = *tray_guard {
+            service.is_window_hidden().await
+        } else {
+            false
+        }
+    };
+
+    // If window is hidden, show it first and start recording
+    if is_window_hidden {
+        let tray_guard = tray_state.lock().await;
+        if let Some(ref service) = *tray_guard {
+            service
+                .show_window_and_start_recording()
+                .await
+                .map_err(|e| format!("Failed to show window and start recording: {}", e))?;
+            return Ok("Window shown and recording started from tray".to_string());
+        }
+    }
+
+    // Normal toggle behavior when window is visible
+    let state_guard = audio_state.lock().await;
+
+    if let Some(ref capture) = *state_guard {
+        let is_currently_recording = capture.is_recording();
+
+        if is_currently_recording {
+            // Stop recording
+            let path = capture
+                .stop_capture()
+                .await
+                .map_err(|e| format!("Failed to stop capture: {}", e))?;
+
+            // Update tray status
+            let tray_guard = tray_state.lock().await;
+            if let Some(ref service) = *tray_guard {
+                if let Err(e) = service.update_tray_status("Ready").await {
+                    eprintln!("Failed to update tray status: {}", e);
+                }
+            }
+
+            Ok(format!(
+                "Recording stopped. File saved: {}",
+                path.to_string_lossy()
+            ))
+        } else {
+            // Start recording
+            let path = capture
+                .start_capture()
+                .await
+                .map_err(|e| format!("Failed to start capture: {}", e))?;
+
+            // Update tray status
+            let tray_guard = tray_state.lock().await;
+            if let Some(ref service) = *tray_guard {
+                if let Err(e) = service.update_tray_status("Recording").await {
+                    eprintln!("Failed to update tray status: {}", e);
+                }
+            }
+
+            Ok(format!(
+                "Recording started. Temp file: {}",
+                path.to_string_lossy()
+            ))
+        }
+    } else {
+        Err("Audio capture not initialized".to_string())
+    }
+}
+
+/// Toggle recording state - original function for backward compatibility
 #[tauri::command]
 pub async fn toggle_record(audio_state: State<'_, AudioCaptureState>) -> Result<String, String> {
     let state_guard = audio_state.lock().await;
