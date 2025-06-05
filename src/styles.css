@@ -389,48 +389,86 @@
   }
 }
 
-.stop-button {
+/* Record/Stop Toggle Button - replaces stop-button */
+.record-stop-toggle {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-  border: 2px solid #ff0033;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border: 2px solid;
 }
 
-.stop-button:hover:not(:disabled) {
+/* Ready state (not recording) - Record button */
+.record-stop-toggle.ready {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  border-color: #00ffcc;
+}
+
+.record-stop-toggle.ready:hover {
   background: linear-gradient(145deg, #333, #222);
   box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
   transform: scale(1.05);
 }
 
-.stop-button:active:not(:disabled) {
+.record-stop-toggle.ready:active {
   transform: scale(0.95);
 }
 
-.stop-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  border-color: #666;
-  background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+/* Recording state - Stop button */
+.record-stop-toggle.recording {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  border-color: #ff0033;
+  animation: pulse-recording 2s infinite;
 }
 
-.stop-button:disabled .stop-icon {
-  background: #666;
-  box-shadow: none;
+.record-stop-toggle.recording:hover {
+  background: linear-gradient(145deg, #333, #222);
+  box-shadow: 0 0 10px rgba(255, 0, 51, 0.3);
+  transform: scale(1.05);
 }
 
-.stop-icon {
+.record-stop-toggle.recording:active {
+  transform: scale(0.95);
+}
+
+/* Icons */
+.toggle-icon {
   width: 20px;
   height: 20px;
+  transition: all 0.3s ease;
+}
+
+/* Record icon (circle) */
+.record-icon {
+  border-radius: 50%;
+  background: #00ffcc;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
+
+/* Stop icon (square) */
+.stop-icon {
   background: #ff0033;
-  border-radius: 2px;
-  box-shadow: 0 0 8px rgba(255, 0, 51, 0.6);
+  box-shadow: 0 0 8px rgba(255, 0, 51, 0.5);
+}
+
+/* Pulse animation for recording state */
+@keyframes pulse-recording {
+  0%,
+  100% {
+    box-shadow:
+      0 4px 8px rgba(0, 0, 0, 0.3),
+      0 0 0 0 rgba(255, 0, 51, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 4px 8px rgba(0, 0, 0, 0.3),
+      0 0 0 8px rgba(255, 0, 51, 0);
+  }
 }
 
 /* Boutons de profil */

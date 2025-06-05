@@ -3,7 +3,7 @@ import { useSystemTray } from './hooks/useSystemTray'
 import { TooltipProvider } from './components/ui/tooltip'
 import { RecordingProvider } from './contexts/RecordingContext'
 import { ProfileProvider } from './contexts/ProfileContext'
-import StopButton from './components/StopButton'
+import RecordStopToggleButton from './components/StopButton'
 import ProfileButtons from './components/ProfileButtons'
 import ElapsedTime from './components/ElapsedTime'
 import VolumeVisualizer from './components/VolumeVisualizer'
@@ -209,7 +209,7 @@ function App() {
                 <VolumeVisualizer />
                 <ElapsedTime />
               </div>
-              <StopButton />
+              <RecordStopToggleButton />
             </div>
 
             <ProfileButtons />

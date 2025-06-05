@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock the recording context
+const mockStartRecording = vi.fn()
 const mockStopRecording = vi.fn()
 const mockUseRecording = vi.fn()
 
@@ -9,148 +10,203 @@ vi.mock('../../contexts/RecordingContext', () => ({
 }))
 
 // Mock React component for testing purposes
-const mockStopButton = (isRecording: boolean) => {
-  const { stopRecording } = mockUseRecording()
+const mockRecordStopToggleButton = (isRecording: boolean) => {
+  const { startRecording, stopRecording } = mockUseRecording()
 
-  const handleStop = async () => {
+  const handleToggle = async () => {
     if (isRecording) {
       await stopRecording()
+    } else {
+      await startRecording()
     }
   }
 
   return {
-    isDisabled: !isRecording,
-    ariaLabel: 'Stop recording',
-    title: isRecording ? 'Stop recording' : 'No recording in progress',
-    className: 'stop-button',
-    onClick: handleStop,
+    className: `record-stop-toggle ${isRecording ? 'recording' : 'ready'}`,
+    ariaLabel: isRecording ? 'Stop recording' : 'Start recording',
+    tooltipContent: isRecording ? 'Stop recording' : 'Start recording',
+    iconClassName: `toggle-icon ${isRecording ? 'stop-icon' : 'record-icon'}`,
+    onClick: handleToggle,
   }
 }
 
-describe('StopButton Component Logic', () => {
+describe('RecordStopToggleButton Component Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
+    // Default mock implementation
     mockUseRecording.mockReturnValue({
+      startRecording: mockStartRecording,
       stopRecording: mockStopRecording,
       isRecording: false,
     })
   })
 
-  it('should have correct properties when not recording', () => {
-    mockUseRecording.mockReturnValue({
-      stopRecording: mockStopRecording,
-      isRecording: false,
+  describe('Ready State (Not Recording)', () => {
+    it('should render in ready state when not recording', () => {
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: false,
+      })
+
+      const button = mockRecordStopToggleButton(false)
+
+      expect(button.className).toBe('record-stop-toggle ready')
+      expect(button.ariaLabel).toBe('Start recording')
+      expect(button.tooltipContent).toBe('Start recording')
+      expect(button.iconClassName).toBe('toggle-icon record-icon')
     })
 
-    const button = mockStopButton(false)
+    it('should call startRecording when clicked in ready state', async () => {
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: false,
+      })
 
-    expect(button.isDisabled).toBe(true)
-    expect(button.ariaLabel).toBe('Stop recording')
-    expect(button.title).toBe('No recording in progress')
-    expect(button.className).toBe('stop-button')
-  })
+      const button = mockRecordStopToggleButton(false)
 
-  it('should have correct properties when recording', () => {
-    mockUseRecording.mockReturnValue({
-      stopRecording: mockStopRecording,
-      isRecording: true,
-    })
-
-    const button = mockStopButton(true)
-
-    expect(button.isDisabled).toBe(false)
-    expect(button.ariaLabel).toBe('Stop recording')
-    expect(button.title).toBe('Stop recording')
-    expect(button.className).toBe('stop-button')
-  })
-
-  it('should call stopRecording when clicked while recording', async () => {
-    mockUseRecording.mockReturnValue({
-      stopRecording: mockStopRecording,
-      isRecording: true,
-    })
-
-    const button = mockStopButton(true)
-    await button.onClick()
-
-    expect(mockStopRecording).toHaveBeenCalledTimes(1)
-  })
-
-  it('should not call stopRecording when clicked while not recording', async () => {
-    mockUseRecording.mockReturnValue({
-      stopRecording: mockStopRecording,
-      isRecording: false,
-    })
-
-    const button = mockStopButton(false)
-    await button.onClick()
-
-    expect(mockStopRecording).not.toHaveBeenCalled()
-  })
-
-  it('should handle async stopRecording errors gracefully', async () => {
-    mockStopRecording.mockRejectedValue(new Error('Stop recording failed'))
-
-    mockUseRecording.mockReturnValue({
-      stopRecording: mockStopRecording,
-      isRecording: true,
-    })
-
-    const button = mockStopButton(true)
-
-    // The click should call stopRecording even if it fails
-    // In a real component, we'd want to handle the error gracefully
-    try {
       await button.onClick()
-    } catch (error) {
-      // Expected to throw since we mocked it to reject
-      expect(error).toBeInstanceOf(Error)
-      expect((error as Error).message).toBe('Stop recording failed')
-    }
 
-    expect(mockStopRecording).toHaveBeenCalledTimes(1)
+      expect(mockStartRecording).toHaveBeenCalledTimes(1)
+      expect(mockStopRecording).not.toHaveBeenCalled()
+    })
+
+    it('should handle async startRecording errors gracefully', async () => {
+      mockStartRecording.mockRejectedValue(new Error('Start recording failed'))
+
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: false,
+      })
+
+      const button = mockRecordStopToggleButton(false)
+
+      try {
+        await button.onClick()
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toBe('Start recording failed')
+      }
+
+      expect(mockStartRecording).toHaveBeenCalledTimes(1)
+    })
   })
 
-  it('should integrate properly with useRecording hook', () => {
-    const mockRecordingState = {
-      stopRecording: mockStopRecording,
-      isRecording: true,
-    }
+  describe('Recording State', () => {
+    it('should render in recording state when recording is active', () => {
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: true,
+      })
 
-    mockUseRecording.mockReturnValue(mockRecordingState)
+      const button = mockRecordStopToggleButton(true)
 
-    // Simulate component using the hook
-    const { stopRecording, isRecording } = mockUseRecording()
+      expect(button.className).toBe('record-stop-toggle recording')
+      expect(button.ariaLabel).toBe('Stop recording')
+      expect(button.tooltipContent).toBe('Stop recording')
+      expect(button.iconClassName).toBe('toggle-icon stop-icon')
+    })
 
-    expect(mockUseRecording).toHaveBeenCalledTimes(1)
-    expect(stopRecording).toBe(mockStopRecording)
-    expect(isRecording).toBe(true)
+    it('should call stopRecording when clicked in recording state', async () => {
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: true,
+      })
+
+      const button = mockRecordStopToggleButton(true)
+
+      await button.onClick()
+
+      expect(mockStopRecording).toHaveBeenCalledTimes(1)
+      expect(mockStartRecording).not.toHaveBeenCalled()
+    })
+
+    it('should handle async stopRecording errors gracefully', async () => {
+      mockStopRecording.mockRejectedValue(new Error('Stop recording failed'))
+
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: true,
+      })
+
+      const button = mockRecordStopToggleButton(true)
+
+      try {
+        await button.onClick()
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toBe('Stop recording failed')
+      }
+
+      expect(mockStopRecording).toHaveBeenCalledTimes(1)
+    })
   })
 
-  it('should have correct disabled state based on recording status', () => {
-    // Test when not recording
-    const buttonNotRecording = mockStopButton(false)
-    expect(buttonNotRecording.isDisabled).toBe(true)
+  describe('Toggle Behavior', () => {
+    it('should toggle between start and stop correctly', async () => {
+      // Reset the mocks to ensure clean state
+      mockStartRecording.mockReset()
+      mockStopRecording.mockReset()
 
-    // Test when recording
-    const buttonRecording = mockStopButton(true)
-    expect(buttonRecording.isDisabled).toBe(false)
-  })
+      // Test starting recording
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: false,
+      })
 
-  it('should have accessibility attributes', () => {
-    const button = mockStopButton(true)
+      let button = mockRecordStopToggleButton(false)
+      await button.onClick()
+      expect(mockStartRecording).toHaveBeenCalledTimes(1)
 
-    expect(button.ariaLabel).toBe('Stop recording')
-    expect(button.title).toBeTruthy()
-    expect(typeof button.title).toBe('string')
-  })
+      // Test stopping recording
+      mockUseRecording.mockReturnValue({
+        startRecording: mockStartRecording,
+        stopRecording: mockStopRecording,
+        isRecording: true,
+      })
 
-  it('should provide different tooltips based on recording state', () => {
-    const buttonNotRecording = mockStopButton(false)
-    expect(buttonNotRecording.title).toBe('No recording in progress')
+      button = mockRecordStopToggleButton(true)
+      await button.onClick()
+      expect(mockStopRecording).toHaveBeenCalledTimes(1)
+    })
 
-    const buttonRecording = mockStopButton(true)
-    expect(buttonRecording.title).toBe('Stop recording')
+    it('should have correct accessibility attributes for both states', () => {
+      // Ready state
+      const readyButton = mockRecordStopToggleButton(false)
+      expect(readyButton.ariaLabel).toBe('Start recording')
+
+      // Recording state
+      const recordingButton = mockRecordStopToggleButton(true)
+      expect(recordingButton.ariaLabel).toBe('Stop recording')
+    })
+
+    it('should have correct tooltips for both states', () => {
+      // Ready state
+      const readyButton = mockRecordStopToggleButton(false)
+      expect(readyButton.tooltipContent).toBe('Start recording')
+
+      // Recording state
+      const recordingButton = mockRecordStopToggleButton(true)
+      expect(recordingButton.tooltipContent).toBe('Stop recording')
+    })
+
+    it('should have correct CSS classes for both states', () => {
+      // Ready state
+      const readyButton = mockRecordStopToggleButton(false)
+      expect(readyButton.className).toBe('record-stop-toggle ready')
+      expect(readyButton.iconClassName).toBe('toggle-icon record-icon')
+
+      // Recording state
+      const recordingButton = mockRecordStopToggleButton(true)
+      expect(recordingButton.className).toBe('record-stop-toggle recording')
+      expect(recordingButton.iconClassName).toBe('toggle-icon stop-icon')
+    })
   })
 })

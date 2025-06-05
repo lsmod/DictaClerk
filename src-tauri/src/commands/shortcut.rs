@@ -114,7 +114,6 @@ pub async fn toggle_record_with_tray(
         }
     }
 
-    // Normal toggle behavior when window is visible
     let state_guard = audio_state.lock().await;
 
     if let Some(ref capture) = *state_guard {
@@ -140,7 +139,8 @@ pub async fn toggle_record_with_tray(
                 path.to_string_lossy()
             ))
         } else {
-            // Start recording
+            // Window is visible and recording is stopped - start recording
+            // This handles the UX issue where users want to restart recording
             let path = capture
                 .start_capture()
                 .await
@@ -155,7 +155,7 @@ pub async fn toggle_record_with_tray(
             }
 
             Ok(format!(
-                "Recording started. Temp file: {}",
+                "Recording started from global shortcut. Temp file: {}",
                 path.to_string_lossy()
             ))
         }
