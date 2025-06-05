@@ -5,6 +5,7 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 interface RecordingContextType {
   isRecording: boolean
@@ -36,6 +37,43 @@ export const RecordingProvider: React.FC<RecordingProviderProps> = ({
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
 
+  // Initialize audio capture on mount
+  useEffect(() => {
+    const initializeAudio = async () => {
+      try {
+        await invoke('init_audio_capture')
+        console.log('Audio capture initialized successfully')
+
+        // Check initial recording state
+        const initialRecordingState = await invoke('is_recording')
+        console.log('Initial recording state:', initialRecordingState)
+        setIsRecording(initialRecordingState as boolean)
+      } catch (error) {
+        console.error('Failed to initialize audio capture:', error)
+      }
+    }
+
+    initializeAudio()
+  }, [])
+
+  // Poll recording state to keep in sync with backend
+  useEffect(() => {
+    const pollRecordingState = async () => {
+      try {
+        const backendState = await invoke('is_recording')
+        if (backendState !== isRecording) {
+          console.log('Syncing recording state:', backendState)
+          setIsRecording(backendState as boolean)
+        }
+      } catch {
+        // Ignore errors during polling
+      }
+    }
+
+    const interval = setInterval(pollRecordingState, 1000) // Check every second
+    return () => clearInterval(interval)
+  }, [isRecording])
+
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
 
@@ -56,16 +94,20 @@ export const RecordingProvider: React.FC<RecordingProviderProps> = ({
 
   // Listen for recording events from tray or backend
   useEffect(() => {
-    const handleStartRecording = () => {
-      setIsRecording(true)
+    const handleStartRecording = async () => {
+      await startRecordingBackend()
     }
 
-    const handleStopRecording = () => {
-      setIsRecording(false)
+    const handleStopRecording = async () => {
+      await stopRecordingBackend()
     }
 
-    const handleToggleRecording = () => {
-      setIsRecording((prev) => !prev)
+    const handleToggleRecording = async () => {
+      if (isRecording) {
+        await stopRecordingBackend()
+      } else {
+        await startRecordingBackend()
+      }
     }
 
     window.addEventListener('start-recording', handleStartRecording)
@@ -77,25 +119,45 @@ export const RecordingProvider: React.FC<RecordingProviderProps> = ({
       window.removeEventListener('stop-recording', handleStopRecording)
       window.removeEventListener('toggle-recording', handleToggleRecording)
     }
-  }, [])
+  }, [isRecording])
 
-  const startRecording = () => {
-    setIsRecording(true)
-    // Emit event for other components or backend
-    window.dispatchEvent(new CustomEvent('start-recording'))
+  const startRecordingBackend = async () => {
+    try {
+      console.log('Starting recording backend...')
+      const result = await invoke('start_capture')
+      console.log('Recording started:', result)
+      setIsRecording(true)
+      // Don't emit event here to avoid circular triggers
+    } catch (error) {
+      console.error('Failed to start recording:', error)
+    }
   }
 
-  const stopRecording = () => {
-    setIsRecording(false)
-    // Emit event for other components or backend
-    window.dispatchEvent(new CustomEvent('stop-recording'))
+  const stopRecordingBackend = async () => {
+    try {
+      console.log('Stopping recording backend...')
+      const result = await invoke('stop_capture')
+      console.log('Recording stopped:', result)
+      setIsRecording(false)
+      // Don't emit event here to avoid circular triggers
+    } catch (error) {
+      console.error('Failed to stop recording:', error)
+    }
   }
 
-  const toggleRecording = () => {
+  const startRecording = async () => {
+    await startRecordingBackend()
+  }
+
+  const stopRecording = async () => {
+    await stopRecordingBackend()
+  }
+
+  const toggleRecording = async () => {
     if (isRecording) {
-      stopRecording()
+      await stopRecording()
     } else {
-      startRecording()
+      await startRecording()
     }
   }
 

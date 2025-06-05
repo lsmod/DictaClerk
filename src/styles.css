@@ -287,6 +287,49 @@
   }
 }
 
+/* Center-symmetric volume bar container */
+.volume-bar-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column-reverse; /* Bottom half grows downward, top half grows upward */
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* Half-bar styles for center-symmetric rendering */
+.volume-bar-half {
+  width: 100%;
+  transition: all 0.1s ease;
+  border-radius: 1px;
+  min-height: 1px;
+}
+
+/* Top half (grows upward from center) */
+.volume-bar-top {
+  align-self: flex-end;
+}
+
+/* Bottom half (grows downward from center) */
+.volume-bar-bottom {
+  align-self: flex-start;
+}
+
+/* Recording state styles */
+.volume-bar-half.recording {
+  background: linear-gradient(to top, #ff0033, #ff6666);
+  box-shadow: 0 0 3px rgba(255, 0, 51, 0.5);
+  animation: volumePulseRecording 1s ease-in-out infinite;
+}
+
+/* Idle state styles */
+.volume-bar-half.idle {
+  background: linear-gradient(to top, #333, #666);
+  box-shadow: 0 0 1px rgba(102, 102, 102, 0.3);
+  animation: volumePulseIdle 3s ease-in-out infinite;
+}
+
+/* Legacy volume-bar styles (keeping for compatibility) */
 .volume-bar {
   flex: 1;
   background: linear-gradient(to top, #ff0033, #00ffcc);
@@ -791,4 +834,17 @@
   max-width: none;
   border: none;
   background: transparent;
+}
+
+/* Screen reader only content - accessible but visually hidden */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
