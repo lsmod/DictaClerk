@@ -4,17 +4,18 @@ pub mod config;
 pub mod services;
 
 use commands::{
-    auto_init_shortcut_mgr, check_shortcut_available, close_settings_window, copy_to_clipboard,
-    encode_wav_to_ogg, get_clipboard_info, get_encoder_info, get_shortcut_status, get_whisper_info,
-    handle_window_close, hide_main_window, init_audio_capture, init_clipboard_service,
-    init_shortcut_mgr, init_system_tray, init_whisper_client, is_clipboard_initialized,
-    is_recording, is_settings_window_open, is_whisper_initialized, is_window_hidden,
-    open_settings_window, register_all_profile_shortcuts, register_global_shortcut,
-    register_profile_shortcut, show_main_window, show_window_and_start_recording, start_capture,
-    stop_capture, subscribe_rms, toggle_main_window, toggle_record, toggle_record_with_tray,
-    transcribe_audio, transcribe_recorded_audio, unregister_all_profile_shortcuts,
-    unregister_global_shortcut, unregister_profile_shortcut, update_global_shortcut,
-    update_tray_global_shortcut, update_tray_status, AudioCaptureState, ClipboardServiceState,
+    apply_profile_to_text, auto_init_shortcut_mgr, check_shortcut_available, close_settings_window,
+    copy_to_clipboard, encode_wav_to_ogg, get_active_profile, get_clipboard_info, get_encoder_info,
+    get_shortcut_status, get_whisper_info, handle_window_close, hide_main_window,
+    init_audio_capture, init_clipboard_service, init_shortcut_mgr, init_system_tray,
+    init_whisper_client, is_clipboard_initialized, is_recording, is_settings_window_open,
+    is_whisper_initialized, is_window_hidden, load_profiles, open_settings_window,
+    register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
+    select_profile, show_main_window, show_window_and_start_recording, start_capture, stop_capture,
+    subscribe_rms, toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
+    transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
+    unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
+    update_tray_status, AudioCaptureState, ClipboardServiceState, ProfileAppState,
     ShortcutMgrState, SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
@@ -44,6 +45,9 @@ pub fn run() {
         .manage(Arc::new(Mutex::new(None)) as ShortcutMgrState)
         .manage(Arc::new(Mutex::new(None)) as ClipboardServiceState)
         .manage(Arc::new(Mutex::new(None)) as SystemTrayState)
+        .manage(
+            std::sync::Mutex::new(commands::profiles::ProfileState::default()) as ProfileAppState,
+        )
         .invoke_handler(tauri::generate_handler![
             greet,
             init_audio_capture,
@@ -86,7 +90,11 @@ pub fn run() {
             update_tray_global_shortcut,
             open_settings_window,
             close_settings_window,
-            is_settings_window_open
+            is_settings_window_open,
+            load_profiles,
+            select_profile,
+            get_active_profile,
+            apply_profile_to_text
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

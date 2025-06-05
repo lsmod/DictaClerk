@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSystemTray } from './hooks/useSystemTray'
 import { TooltipProvider } from './components/ui/tooltip'
 import { RecordingProvider } from './contexts/RecordingContext'
+import { ProfileProvider } from './contexts/ProfileContext'
 import StopButton from './components/StopButton'
 import ProfileButtons from './components/ProfileButtons'
 import ElapsedTime from './components/ElapsedTime'
@@ -178,40 +179,44 @@ function App() {
   // Render settings window content
   if (isSettingsWindow) {
     return (
-      <TooltipProvider>
-        <div className="settings-window">
-          <SettingsSheet
-            onClose={() => {
-              // Close the settings window
-              invoke('close_settings_window').catch(console.error)
-            }}
-          />
-        </div>
-      </TooltipProvider>
+      <ProfileProvider>
+        <TooltipProvider>
+          <div className="settings-window">
+            <SettingsSheet
+              onClose={() => {
+                // Close the settings window
+                invoke('close_settings_window').catch(console.error)
+              }}
+            />
+          </div>
+        </TooltipProvider>
+      </ProfileProvider>
     )
   }
 
   // Render main window content
   return (
-    <RecordingProvider>
-      <TooltipProvider>
-        <div className="synth-interface" data-tauri-drag-region>
-          <div className="synth-header">
-            <SettingsButton />
-          </div>
-
-          <div className="main-controls">
-            <div className="volume-section">
-              <VolumeVisualizer />
-              <ElapsedTime />
+    <ProfileProvider>
+      <RecordingProvider>
+        <TooltipProvider>
+          <div className="synth-interface" data-tauri-drag-region>
+            <div className="synth-header">
+              <SettingsButton />
             </div>
-            <StopButton />
-          </div>
 
-          <ProfileButtons />
-        </div>
-      </TooltipProvider>
-    </RecordingProvider>
+            <div className="main-controls">
+              <div className="volume-section">
+                <VolumeVisualizer />
+                <ElapsedTime />
+              </div>
+              <StopButton />
+            </div>
+
+            <ProfileButtons />
+          </div>
+        </TooltipProvider>
+      </RecordingProvider>
+    </ProfileProvider>
   )
 }
 
