@@ -101,6 +101,12 @@
 /* Draggable window region - exclude interactive elements */
 .synth-interface[data-tauri-drag-region] {
   -webkit-app-region: drag;
+  cursor: move; /* Show move cursor on draggable areas */
+}
+
+/* When actively dragging, show grabbing cursor */
+.synth-interface[data-tauri-drag-region]:active {
+  cursor: grabbing;
 }
 
 .synth-interface[data-tauri-drag-region] button,
@@ -108,6 +114,40 @@
 .synth-interface[data-tauri-drag-region] .profile-button,
 .synth-interface[data-tauri-drag-region] .settings-button {
   -webkit-app-region: no-drag;
+  cursor: pointer; /* Ensure buttons show pointer cursor */
+}
+
+/* Specific draggable areas with enhanced cursor feedback */
+.synth-interface[data-tauri-drag-region] .synth-header {
+  cursor: move; /* Header area is draggable */
+}
+
+/* Volume section contains interactive elements - let them handle their own cursors */
+.synth-interface[data-tauri-drag-region] .volume-section {
+  cursor: default; /* Let child elements define their cursors */
+}
+
+/* Volume visualizer contains interactive elements - use default cursor */
+.synth-interface[data-tauri-drag-region] .volume-visualizer {
+  cursor: default; /* Override move cursor for interactive area */
+}
+
+.synth-interface[data-tauri-drag-region] .elapsed-time {
+  cursor: move; /* Small text area can be draggable */
+}
+
+/* Profile buttons area contains interactive elements - use default cursor */
+.synth-interface[data-tauri-drag-region] .profile-buttons {
+  cursor: default; /* Override move cursor for interactive area */
+}
+
+/* Ensure interactive elements override the window hover effect */
+.synth-interface[data-tauri-drag-region] button:hover,
+.synth-interface[data-tauri-drag-region] .stop-button:hover,
+.synth-interface[data-tauri-drag-region] .profile-button:hover,
+.synth-interface[data-tauri-drag-region] .settings-button:hover {
+  cursor: pointer;
+  /* These elements will use their own hover effects */
 }
 
 /* Synthétiseur Interface Styles - Adjusted for borderless window */
@@ -127,6 +167,15 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  transition: all 0.2s ease; /* Smooth transition for hover effects */
+}
+
+/* Subtle hover effect for draggable window */
+.synth-interface[data-tauri-drag-region]:hover {
+  border-color: rgba(0, 255, 204, 0.3);
+  box-shadow:
+    0 0 20px rgba(0, 255, 204, 0.25),
+    inset 0 1px 3px rgba(255, 255, 255, 0.1);
 }
 
 /* Header avec settings - Compact for borderless */
