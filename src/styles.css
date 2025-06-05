@@ -403,14 +403,26 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-.stop-button:hover {
+.stop-button:hover:not(:disabled) {
   background: linear-gradient(145deg, #333, #222);
   box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
   transform: scale(1.05);
 }
 
-.stop-button:active {
+.stop-button:active:not(:disabled) {
   transform: scale(0.95);
+}
+
+.stop-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #666;
+  background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+}
+
+.stop-button:disabled .stop-icon {
+  background: #666;
+  box-shadow: none;
 }
 
 .stop-icon {
