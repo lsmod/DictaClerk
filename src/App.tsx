@@ -1,18 +1,52 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSystemTray } from './hooks/useSystemTray'
 import { TooltipProvider } from './components/ui/tooltip'
+import { RecordingProvider } from './contexts/RecordingContext'
 import StopButton from './components/StopButton'
 import ProfileButtons from './components/ProfileButtons'
 import ElapsedTime from './components/ElapsedTime'
 import VolumeVisualizer from './components/VolumeVisualizer'
 import SettingsButton from './components/SettingsButton'
+import SettingsSheet from './components/SettingsSheet'
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 function App() {
   const { initializeTray, updateTrayStatus, hideWindow } = useSystemTray()
+  const [isSettingsWindow, setIsSettingsWindow] = useState(false)
 
-  // Initialize system tray on app startup
+  // Check if this is the settings window
   useEffect(() => {
+    const checkWindowType = async () => {
+      try {
+        const currentWindow = getCurrentWebviewWindow()
+        const windowLabel = currentWindow.label
+        setIsSettingsWindow(windowLabel === 'settings')
+      } catch (error) {
+        console.error('Failed to get window info:', error)
+      }
+    }
+
+    checkWindowType()
+  }, [])
+
+  // Listen for show-settings event (for settings window)
+  useEffect(() => {
+    const handleShowSettings = () => {
+      setIsSettingsWindow(true)
+    }
+
+    window.addEventListener('show-settings', handleShowSettings)
+
+    return () => {
+      window.removeEventListener('show-settings', handleShowSettings)
+    }
+  }, [])
+
+  // Initialize system tray on app startup (only for main window)
+  useEffect(() => {
+    if (isSettingsWindow) return
+
     const initTray = async () => {
       try {
         // Check if this is first launch (you might want to store this in settings)
@@ -53,10 +87,12 @@ function App() {
     }
 
     initTray()
-  }, [initializeTray])
+  }, [initializeTray, isSettingsWindow])
 
-  // Handle tray events
+  // Handle tray events (only for main window)
   useEffect(() => {
+    if (isSettingsWindow) return
+
     const handleTrayStartRecording = () => {
       console.log('Starting recording from tray')
       updateTrayStatus('Recording')
@@ -117,10 +153,12 @@ function App() {
       window.removeEventListener('tray-toggle-record', handleTrayToggleRecord)
       window.removeEventListener('tray-show-settings', handleTrayShowSettings)
     }
-  }, [updateTrayStatus])
+  }, [updateTrayStatus, isSettingsWindow])
 
-  // Handle window close event (minimize to tray)
+  // Handle window close event (minimize to tray) - only for main window
   useEffect(() => {
+    if (isSettingsWindow) return
+
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       e.preventDefault()
       try {
@@ -135,26 +173,45 @@ function App() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [hideWindow])
+  }, [hideWindow, isSettingsWindow])
 
+  // Render settings window content
+  if (isSettingsWindow) {
+    return (
+      <TooltipProvider>
+        <div className="settings-window">
+          <SettingsSheet
+            onClose={() => {
+              // Close the settings window
+              invoke('close_settings_window').catch(console.error)
+            }}
+          />
+        </div>
+      </TooltipProvider>
+    )
+  }
+
+  // Render main window content
   return (
-    <TooltipProvider>
-      <div className="synth-interface">
-        <div className="synth-header">
-          <SettingsButton />
-        </div>
-
-        <div className="main-controls">
-          <div className="volume-section">
-            <VolumeVisualizer />
-            <ElapsedTime />
+    <RecordingProvider>
+      <TooltipProvider>
+        <div className="synth-interface" data-tauri-drag-region>
+          <div className="synth-header">
+            <SettingsButton />
           </div>
-          <StopButton />
-        </div>
 
-        <ProfileButtons />
-      </div>
-    </TooltipProvider>
+          <div className="main-controls">
+            <div className="volume-section">
+              <VolumeVisualizer />
+              <ElapsedTime />
+            </div>
+            <StopButton />
+          </div>
+
+          <ProfileButtons />
+        </div>
+      </TooltipProvider>
+    </RecordingProvider>
   )
 }
 

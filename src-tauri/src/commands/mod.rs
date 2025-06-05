@@ -21,7 +21,8 @@ pub use shortcut::{
     ShortcutMgrState,
 };
 pub use system_tray::{
-    handle_window_close, hide_main_window, init_system_tray, is_window_hidden, show_main_window,
+    close_settings_window, handle_window_close, hide_main_window, init_system_tray,
+    is_settings_window_open, is_window_hidden, open_settings_window, show_main_window,
     show_window_and_start_recording, toggle_main_window, update_tray_global_shortcut,
     update_tray_status, SystemTrayState,
 };

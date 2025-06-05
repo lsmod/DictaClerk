@@ -2,7 +2,7 @@
 
 use crate::services::{SystemTrayConfig, SystemTrayService};
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder};
 use tokio::sync::Mutex;
 
 /// Global state for the system tray service
@@ -176,4 +176,57 @@ pub async fn update_tray_global_shortcut(
     } else {
         Err("System tray not initialized".to_string())
     }
+}
+
+/// Open settings window
+#[tauri::command]
+pub async fn open_settings_window(app_handle: AppHandle) -> Result<String, String> {
+    // Check if settings window already exists
+    if let Some(_window) = app_handle.get_webview_window("settings") {
+        // Settings window exists, just focus it
+        _window
+            .set_focus()
+            .map_err(|e| format!("Failed to focus settings window: {}", e))?;
+        return Ok("Settings window focused".to_string());
+    }
+
+    // Create new settings window
+    let settings_window = WebviewWindowBuilder::new(
+        &app_handle,
+        "settings",
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("DictaClerk Settings")
+    .inner_size(600.0, 700.0)
+    .min_inner_size(500.0, 600.0)
+    .center()
+    .focused(true)
+    .build()
+    .map_err(|e| format!("Failed to create settings window: {}", e))?;
+
+    // Emit event to the settings window to show settings content
+    settings_window
+        .emit("show-settings", ())
+        .map_err(|e| format!("Failed to emit show-settings event: {}", e))?;
+
+    Ok("Settings window opened".to_string())
+}
+
+/// Close settings window
+#[tauri::command]
+pub async fn close_settings_window(app_handle: AppHandle) -> Result<String, String> {
+    if let Some(window) = app_handle.get_webview_window("settings") {
+        window
+            .close()
+            .map_err(|e| format!("Failed to close settings window: {}", e))?;
+        Ok("Settings window closed".to_string())
+    } else {
+        Err("Settings window not found".to_string())
+    }
+}
+
+/// Check if settings window is open
+#[tauri::command]
+pub async fn is_settings_window_open(app_handle: AppHandle) -> Result<bool, String> {
+    Ok(app_handle.get_webview_window("settings").is_some())
 }

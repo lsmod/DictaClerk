@@ -1,7 +1,10 @@
 import React from 'react'
 import VolumeBar from './VolumeBar'
+import { useRecording } from '../contexts/RecordingContext'
 
 const VolumeVisualizer: React.FC = () => {
+  const { isRecording } = useRecording()
+
   // Génération de 100 barres avec des hauteurs et délais aléatoires
   const bars = Array.from({ length: 100 }, (_, index) => ({
     id: index,
@@ -10,9 +13,14 @@ const VolumeVisualizer: React.FC = () => {
   }))
 
   return (
-    <div className="volume-visualizer">
+    <div className={`volume-visualizer ${isRecording ? 'recording' : 'idle'}`}>
       {bars.map((bar) => (
-        <VolumeBar key={bar.id} height={bar.height} delay={bar.delay} />
+        <VolumeBar
+          key={bar.id}
+          height={bar.height}
+          delay={bar.delay}
+          isRecording={isRecording}
+        />
       ))}
     </div>
   )

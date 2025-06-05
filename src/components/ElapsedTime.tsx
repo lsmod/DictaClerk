@@ -1,15 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
+import { useRecording } from '../contexts/RecordingContext'
 
 const ElapsedTime: React.FC = () => {
-  const [seconds, setSeconds] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSeconds((prev) => prev + 1)
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
+  const { recordingTime, isRecording } = useRecording()
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60)
@@ -19,7 +12,12 @@ const ElapsedTime: React.FC = () => {
       .padStart(2, '0')}`
   }
 
-  return <div className="elapsed-time">{formatTime(seconds)}</div>
+  return (
+    <div className={`elapsed-time ${isRecording ? 'recording' : 'idle'}`}>
+      {isRecording && <span className="recording-indicator">●</span>}
+      {formatTime(recordingTime)}
+    </div>
+  )
 }
 
 export default ElapsedTime

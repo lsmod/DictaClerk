@@ -403,19 +403,30 @@ impl SystemTrayService {
 
         let state = self.window_state.lock().await.clone();
 
-        // Restore position and size
-        if let Err(e) = window.set_position(tauri::PhysicalPosition::new(state.x, state.y)) {
-            eprintln!("Failed to restore window position: {}", e);
-        }
+        // Check if this is a borderless window by checking its decorations
+        let is_borderless = !window.is_decorated().unwrap_or(true);
 
-        if let Err(e) = window.set_size(tauri::PhysicalSize::new(state.width, state.height)) {
-            eprintln!("Failed to restore window size: {}", e);
-        }
+        if is_borderless {
+            // For borderless windows, only restore position, not size or maximized state
+            if let Err(e) = window.set_position(tauri::PhysicalPosition::new(state.x, state.y)) {
+                eprintln!("Failed to restore borderless window position: {}", e);
+            }
+        } else {
+            // For normal windows, restore everything
+            // Restore position and size
+            if let Err(e) = window.set_position(tauri::PhysicalPosition::new(state.x, state.y)) {
+                eprintln!("Failed to restore window position: {}", e);
+            }
 
-        // Restore maximized state
-        if state.is_maximized {
-            if let Err(e) = window.maximize() {
-                eprintln!("Failed to maximize window: {}", e);
+            if let Err(e) = window.set_size(tauri::PhysicalSize::new(state.width, state.height)) {
+                eprintln!("Failed to restore window size: {}", e);
+            }
+
+            // Restore maximized state
+            if state.is_maximized {
+                if let Err(e) = window.maximize() {
+                    eprintln!("Failed to maximize window: {}", e);
+                }
             }
         }
 

@@ -13,9 +13,13 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "DictaClerk",
-        "width": 800,
-        "height": 600
+        "width": 300,
+        "height": 200,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "resizable": false
       }
     ],
     "security": {
