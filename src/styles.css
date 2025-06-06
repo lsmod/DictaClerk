@@ -888,8 +888,34 @@
   pointer-events: auto;
 }
 
-.visible-checkbox [data-radix-checkbox-root] {
+/* Target checkbox by button element and data-state */
+.visible-checkbox button[data-state] {
   margin: 2px; /* Add slight margin for better touch target */
+  min-width: 16px !important;
+  min-height: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+/* Alternative targeting using the className from our component */
+.visible-checkbox .peer {
+  min-width: 16px !important;
+  min-height: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+/* Ensure the checkbox indicator (checkmark) is properly sized and centered */
+.visible-checkbox .peer > * {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .disabled-checkbox {
