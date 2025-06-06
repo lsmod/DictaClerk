@@ -315,6 +315,14 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       }
       setEditingProfile(newProfile)
       setView('editor')
+
+      // Focus first profile input after navigation
+      setTimeout(() => {
+        const firstInput = document.querySelector('.profile-editor input')
+        if (firstInput instanceof HTMLElement) {
+          firstInput.focus()
+        }
+      }, 100)
     },
     navigateBack: () => {
       setView('overview')

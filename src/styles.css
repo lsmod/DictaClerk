@@ -690,6 +690,26 @@
   padding: 8px;
   max-height: 200px;
   overflow-y: auto;
+  position: relative;
+}
+
+/* Enhanced drag-and-drop visual feedback */
+.profiles-list::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0, 255, 204, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  border-radius: 6px 6px 0 0;
+}
+
+.profiles-list[data-dragging='true']::before {
+  opacity: 1;
 }
 
 .profile-row {
@@ -698,28 +718,59 @@
   gap: 12px;
   padding: 8px;
   border-radius: 4px;
-  transition: all 0.2s ease;
   cursor: grab;
   transform-origin: center;
   will-change: transform, opacity;
+  transition:
+    transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
 }
 
-.profile-row:hover:not(.dragging) {
+.profile-row:hover:not(.dragging):not(.keyboard-dragging) {
   background: rgba(0, 255, 204, 0.1);
   box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
   border-color: rgba(0, 255, 204, 0.2);
+  transform: translateY(-1px);
 }
 
 .profile-row:active {
   cursor: grabbing;
 }
 
-.profile-row:not(.dragging) {
-  transition:
-    transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28),
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+.profile-row.dragging {
+  transform: rotate(2deg) scale(1.02);
+  box-shadow:
+    0 8px 25px rgba(0, 255, 204, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  cursor: grabbing;
+  opacity: 0.9;
+}
+
+.profile-row.keyboard-dragging {
+  background: rgba(0, 255, 204, 0.15);
+  box-shadow:
+    0 0 12px rgba(0, 255, 204, 0.4),
+    inset 0 0 8px rgba(0, 255, 204, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.5);
+  animation: keyboard-drag-pulse 2s ease-in-out infinite;
+}
+
+@keyframes keyboard-drag-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 12px rgba(0, 255, 204, 0.4),
+      inset 0 0 8px rgba(0, 255, 204, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(0, 255, 204, 0.6),
+      inset 0 0 12px rgba(0, 255, 204, 0.2);
+  }
 }
 
 .drag-handle {
@@ -731,33 +782,69 @@
   padding: 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .drag-handle:hover {
   opacity: 1;
   background: rgba(0, 255, 204, 0.1);
+  transform: scale(1.1);
 }
 
 .drag-handle:active {
   cursor: grabbing;
+  transform: scale(0.95);
 }
 
-/* Visual feedback for drag target */
-.profiles-list {
-  position: relative;
-}
-
-/* Accessibility improvements */
+/* Enhanced accessibility improvements */
 .drag-handle[aria-pressed='true'] {
   background: rgba(0, 255, 204, 0.2);
   color: #00ffcc;
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
 }
 
-/* Focus states for keyboard navigation */
+/* Enhanced focus states for keyboard navigation */
 .drag-handle:focus-visible {
   outline: 2px solid #00ffcc;
   outline-offset: 2px;
   background: rgba(0, 255, 204, 0.1);
+  border-radius: 4px;
+  opacity: 1;
+  box-shadow:
+    0 0 8px rgba(0, 255, 204, 0.4),
+    inset 0 0 4px rgba(0, 255, 204, 0.1);
+}
+
+/* Loading skeleton animations */
+.profiles-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.profile-skeleton {
+  height: 48px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 255, 204, 0.1) 25%,
+    rgba(0, 255, 204, 0.2) 50%,
+    rgba(0, 255, 204, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 204, 0.1);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .profile-name {
@@ -777,12 +864,14 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  transition: opacity 0.2s ease;
 }
 
 .disabled-checkbox {
   opacity: 0.3;
 }
 
+/* Enhanced button hover effects */
 .edit-button {
   background: linear-gradient(145deg, #2a2a2a, #1a1a1a) !important;
   border: 1px solid #00ffcc !important;
@@ -792,12 +881,39 @@
   padding: 0 !important;
   border-radius: 4px;
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.edit-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 204, 0.2),
+    transparent
+  );
+  transition: left 0.3s ease;
 }
 
 .edit-button:hover {
   background: linear-gradient(145deg, #333, #222) !important;
   box-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
   transform: scale(1.05);
+}
+
+.edit-button:hover::before {
+  left: 100%;
+}
+
+.edit-button:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
 }
 
 .add-profile-button {
@@ -811,12 +927,39 @@
   width: 100%;
   transition: all 0.2s ease;
   box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.add-profile-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 204, 0.2),
+    transparent
+  );
+  transition: left 0.5s ease;
 }
 
 .add-profile-button:hover {
   background: linear-gradient(145deg, #004d42, #003329) !important;
   box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
-  transform: scale(1.05);
+  transform: scale(1.02);
+}
+
+.add-profile-button:hover::before {
+  left: 100%;
+}
+
+.add-profile-button:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
 }
 
 /* Settings window styles for detached window */
@@ -834,7 +977,7 @@
   width: 100%;
 }
 
-/* Loading and error states for settings */
+/* Enhanced loading and error states */
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -870,6 +1013,18 @@
   font-family: 'Orbitron', monospace;
   font-size: 12px;
   margin-bottom: 16px;
+  animation: error-fade-in 0.3s ease-out;
+}
+
+@keyframes error-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .success-message {
@@ -884,6 +1039,18 @@
   font-family: 'Orbitron', monospace;
   font-size: 12px;
   margin-bottom: 16px;
+  animation: success-fade-in 0.3s ease-out;
+}
+
+@keyframes success-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Settings actions */
@@ -974,94 +1141,25 @@
   }
 }
 
-/* Drag and Drop Styles */
-.profile-row.dragging {
-  opacity: 0.5;
-  transform: rotate(5deg);
-  z-index: 1000;
-}
-
-.profile-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  cursor: grab;
-  transform-origin: center;
-  will-change: transform, opacity;
-}
-
-.profile-row:hover:not(.dragging) {
-  background: rgba(0, 255, 204, 0.1);
-  box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
-  border-color: rgba(0, 255, 204, 0.2);
-}
-
-.profile-row:active {
-  cursor: grabbing;
-}
-
-.profile-row:not(.dragging) {
-  transition:
-    transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28),
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.drag-handle {
-  color: #00ffcc;
-  cursor: grab;
-  opacity: 0.7;
-  display: flex;
-  align-items: center;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.drag-handle:hover {
-  opacity: 1;
-  background: rgba(0, 255, 204, 0.1);
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-/* Visual feedback for drag target */
-.profiles-list {
-  position: relative;
-}
-
-/* Accessibility improvements */
-.drag-handle[aria-pressed='true'] {
-  background: rgba(0, 255, 204, 0.2);
-  color: #00ffcc;
-}
-
-/* Focus states for keyboard navigation */
-.drag-handle:focus-visible {
-  outline: 2px solid #00ffcc;
-  outline-offset: 2px;
-  background: rgba(0, 255, 204, 0.1);
-}
-
 /* Profile Editor Styles */
 .profile-editor {
-  padding: 20px;
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 20px;
+  background: linear-gradient(145deg, #1a1a1a, #121212);
+  color: #00ffcc;
+  font-family: 'Orbitron', monospace;
 }
 
 .editor-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
 }
 
 .editor-header h3 {
@@ -1070,6 +1168,7 @@
   font-size: 20px;
   color: #00ffcc;
   letter-spacing: 1px;
+  margin: 0;
 }
 
 .back-button {
@@ -1079,8 +1178,11 @@
   width: 36px !important;
   height: 36px !important;
   padding: 0 !important;
-  border-radius: 50%;
+  border-radius: 6px;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .back-button:hover {
@@ -1089,12 +1191,39 @@
   transform: scale(1.05);
 }
 
+.back-button:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
+}
+
 .editor-form {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  overflow-y: auto;
+  gap: 20px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.editor-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editor-form .form-group label {
+  font-family: 'Orbitron', monospace;
+  font-size: 14px;
+  color: #00ffcc;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.editor-form .toggle-group {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
 }
 
 .editor-form input,
@@ -1104,12 +1233,15 @@
   color: #00ffcc !important;
   font-family: 'Orbitron', monospace;
   border-radius: 4px;
+  padding: 12px;
+  transition: all 0.2s ease;
 }
 
 .editor-form input:focus,
 .editor-form textarea:focus {
   border-color: #00ffcc !important;
   box-shadow: 0 0 10px rgba(0, 255, 204, 0.3) !important;
+  outline: none;
 }
 
 .editor-form input.error,
@@ -1119,75 +1251,119 @@
 }
 
 .error-text {
+  color: #ff0033;
   font-family: 'Orbitron', monospace;
   font-size: 11px;
-  color: #ff0033;
-  text-shadow: 0 0 4px rgba(255, 0, 51, 0.5);
+  padding: 4px 8px;
+  background: rgba(255, 0, 51, 0.1);
+  border: 1px solid rgba(255, 0, 51, 0.3);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .shortcut-field {
-  max-width: 120px;
-}
-
-.toggle-group {
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: space-between;
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
 }
 
 .editor-actions {
   display: flex;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 32px;
   padding-top: 20px;
   border-top: 1px solid #333;
 }
 
 .save-button {
-  flex: 1;
   background: linear-gradient(145deg, #003d33, #002622) !important;
   border: 2px solid #00ffcc !important;
   color: #00ffcc !important;
   font-family: 'Orbitron', monospace;
   font-weight: 600;
-  padding: 12px !important;
+  padding: 12px 24px !important;
   border-radius: 6px;
   transition: all 0.2s ease;
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.save-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 204, 0.2),
+    transparent
+  );
+  transition: left 0.5s ease;
 }
 
 .save-button:hover {
   background: linear-gradient(145deg, #004d42, #003329) !important;
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-  transform: scale(1.05);
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
+  transform: scale(1.02);
+}
+
+.save-button:hover::before {
+  left: 100%;
+}
+
+.save-button:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
 }
 
 .delete-button {
-  flex: 1;
-  background: linear-gradient(145deg, #300000, #200000) !important;
+  background: linear-gradient(145deg, #3d0000, #260000) !important;
   border: 2px solid #ff0033 !important;
   color: #ff0033 !important;
   font-family: 'Orbitron', monospace;
   font-weight: 600;
-  padding: 12px !important;
+  padding: 12px 24px !important;
   border-radius: 6px;
   transition: all 0.2s ease;
   box-shadow: 0 0 15px rgba(255, 0, 51, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.delete-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 0, 51, 0.2),
+    transparent
+  );
+  transition: left 0.5s ease;
 }
 
 .delete-button:hover {
-  background: linear-gradient(145deg, #400000, #300000) !important;
+  background: linear-gradient(145deg, #4d0000, #330000) !important;
   box-shadow: 0 0 25px rgba(255, 0, 51, 0.4);
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
-/* Responsive adjustments */
-@media (max-width: 480px) {
-  .settings-sheet {
-    width: 100% !important;
-  }
+.delete-button:hover::before {
+  left: 100%;
+}
 
-  .shortcut-input-group,
-  .api-key-group {
-    flex-direction: column;
-  }
+.delete-button:focus-visible {
+  outline: 2px solid #ff0033;
+  outline-offset: 2px;
 }
