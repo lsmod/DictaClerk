@@ -1367,3 +1367,113 @@
   outline: 2px solid #ff0033;
   outline-offset: 2px;
 }
+
+/* Enhanced main window accessibility and focus states */
+.synth-interface:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
+  border-color: rgba(0, 255, 204, 0.5);
+  box-shadow:
+    0 0 25px rgba(0, 255, 204, 0.3),
+    inset 0 1px 3px rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced profile button accessibility */
+.profile-button:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 15px rgba(0, 255, 204, 0.4),
+    0 6px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+  z-index: 10;
+}
+
+.profile-button[aria-checked='true']:focus-visible {
+  outline-color: #00ffcc;
+  box-shadow:
+    0 0 20px rgba(0, 255, 204, 0.6),
+    0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Enhanced record button accessibility */
+.record-stop-toggle:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 4px;
+  box-shadow:
+    0 0 20px rgba(0, 255, 204, 0.5),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.record-stop-toggle.recording:focus-visible {
+  outline-color: #ff0033;
+  box-shadow:
+    0 0 20px rgba(255, 0, 51, 0.5),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Profile section improvements */
+.profile-section {
+  position: relative;
+}
+
+.profile-buttons[role='radiogroup']:focus-within {
+  background: rgba(0, 255, 204, 0.05);
+  border-radius: 8px;
+  padding: 4px;
+  margin: -4px;
+}
+
+/* Loading state improvements */
+.profile-buttons[aria-busy='true'] {
+  animation: loading-pulse 2s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .synth-interface:focus-visible {
+    outline-width: 3px;
+    outline-style: solid;
+  }
+
+  .profile-button:focus-visible,
+  .record-stop-toggle:focus-visible {
+    outline-width: 3px;
+    outline-style: solid;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .profile-button,
+  .record-stop-toggle,
+  .synth-interface {
+    transition: none;
+    animation: none;
+  }
+
+  .profile-button:hover,
+  .record-stop-toggle:hover {
+    transform: none;
+  }
+
+  .loading-pulse {
+    animation: none;
+  }
+}
+
+/* Enhanced tooltips for accessibility */
+[role='tooltip'] {
+  z-index: 1000;
+  max-width: 250px;
+}
