@@ -924,6 +924,40 @@
   pointer-events: none;
 }
 
+/* Switch sizing enforcement */
+.toggle-group .peer[role='switch'] {
+  min-width: 48px !important;
+  min-height: 28px !important;
+  width: 48px !important;
+  height: 28px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+/* Switch thumb sizing */
+.toggle-group .peer[role='switch'] > * {
+  min-width: 24px !important;
+  min-height: 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  box-sizing: border-box !important;
+}
+
+/* Override to allow animation - MUST come after the sizing rules */
+.toggle-group .peer[role='switch'] > *[data-state] {
+  transform: none !important;
+}
+
+.toggle-group .peer[role='switch'] > *[data-state='checked'] {
+  transform: translateX(20px) !important;
+  transition: transform 300ms ease-in-out !important;
+}
+
+.toggle-group .peer[role='switch'] > *[data-state='unchecked'] {
+  transform: translateX(0px) !important;
+  transition: transform 300ms ease-in-out !important;
+}
+
 .visibility-limit-indicator {
   color: #00aaff;
   font-size: 10px;
