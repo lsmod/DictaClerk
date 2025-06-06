@@ -1291,6 +1291,15 @@
 }
 
 /* Profile Editor Styles */
+.profile-editor-window {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(145deg, #1a1a1a, #121212);
+}
+
 .profile-editor {
   width: 100%;
   height: 100%;
@@ -1299,6 +1308,8 @@
   padding: 20px;
   background: linear-gradient(145deg, #1a1a1a, #121212);
   color: #00ffcc;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .editor-header {
@@ -1351,6 +1362,8 @@
   gap: 20px;
   max-width: 600px;
   width: 100%;
+  min-height: 0; /* Allow flex item to shrink */
+  padding-bottom: 20px; /* Add some bottom padding for better scrolling */
 }
 
 .editor-form .form-group {

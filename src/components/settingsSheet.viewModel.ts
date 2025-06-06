@@ -301,7 +301,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     },
     navigateToAddProfile: () => {
       const newProfile: Profile = {
-        id: Date.now().toString(),
+        id: '',
         name: '',
         description: '',
         prompt: '',
@@ -468,7 +468,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
         )
         let updatedProfiles: Profile[]
 
-        if (existingProfileIndex >= 0) {
+        if (existingProfileIndex >= 0 && profile.id) {
           // Update existing profile
           updatedProfiles = [...profiles]
           updatedProfiles[existingProfileIndex] = {
@@ -476,15 +476,14 @@ export function useSettingsSheetViewModel(onClose: () => void) {
             updated_at: new Date().toISOString(),
           }
         } else {
-          // Add new profile
-          updatedProfiles = [
-            ...profiles,
-            {
-              ...profile,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-          ]
+          // Add new profile - generate ID if not present
+          const newProfile = {
+            ...profile,
+            id: profile.id || Date.now().toString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          updatedProfiles = [...profiles, newProfile]
         }
 
         // Save to backend

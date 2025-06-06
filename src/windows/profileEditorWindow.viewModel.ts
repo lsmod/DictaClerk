@@ -90,7 +90,7 @@ export function useProfileEditorViewModel(
   const state: ProfileEditorState = {
     formData,
     errors,
-    isNewProfile: !profile.id,
+    isNewProfile: !profile.id || profile.id === '',
   }
 
   const actions: ProfileEditorActions = {
