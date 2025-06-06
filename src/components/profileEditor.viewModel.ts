@@ -4,6 +4,7 @@ import { Profile } from '@/contexts/ProfileContext'
 interface ProfileEditorState {
   formData: Profile
   errors: Record<string, string>
+  isNewProfile: boolean
 }
 
 interface ProfileEditorActions {
@@ -51,6 +52,7 @@ export function useProfileEditorViewModel(
   const state: ProfileEditorState = {
     formData,
     errors,
+    isNewProfile: !profile.id,
   }
 
   const actions: ProfileEditorActions = {

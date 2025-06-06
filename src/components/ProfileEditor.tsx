@@ -28,8 +28,6 @@ export default function ProfileEditor({
   )
   useEffect(onMount, [])
 
-  const isNewProfile = !profile.id || profile.created_at === profile.updated_at
-
   return (
     <div className="profile-editor">
       <div className="editor-header">
@@ -40,7 +38,7 @@ export default function ProfileEditor({
         >
           <ArrowLeft size={16} aria-hidden="true" />
         </Button>
-        <h3>{isNewProfile ? 'Create New Profile' : 'Edit Profile'}</h3>
+        <h3>{state.isNewProfile ? 'Create New Profile' : 'Edit Profile'}</h3>
       </div>
 
       <form
@@ -199,12 +197,12 @@ export default function ProfileEditor({
             className="save-button"
             onClick={actions.saveProfile}
             aria-label={`${
-              isNewProfile ? 'Create' : 'Save changes to'
+              state.isNewProfile ? 'Create' : 'Save changes to'
             } profile ${state.formData.name || 'unnamed'}`}
           >
-            {isNewProfile ? 'Create' : 'Save'}
+            {state.isNewProfile ? 'Create' : 'Save'}
           </Button>
-          {profile.id && !isNewProfile && (
+          {profile.id && !state.isNewProfile && (
             <Button
               type="button"
               className="delete-button"
