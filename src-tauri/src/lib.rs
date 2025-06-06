@@ -9,14 +9,15 @@ use commands::{
     get_shortcut_status, get_whisper_info, handle_window_close, hide_main_window,
     init_audio_capture, init_clipboard_service, init_shortcut_mgr, init_system_tray,
     init_whisper_client, is_clipboard_initialized, is_recording, is_settings_window_open,
-    is_whisper_initialized, is_window_hidden, load_profiles, open_settings_window,
+    is_whisper_initialized, is_window_hidden, load_profiles, load_settings, open_settings_window,
     register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
-    select_profile, show_main_window, show_window_and_start_recording, start_capture, stop_capture,
-    subscribe_rms, toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
+    save_profiles, save_settings, select_profile, show_main_window,
+    show_window_and_start_recording, start_capture, stop_capture, subscribe_rms,
+    toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
     transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
     unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
-    update_tray_status, AudioCaptureState, ClipboardServiceState, ProfileAppState,
-    ShortcutMgrState, SystemTrayState, WhisperClientState,
+    update_tray_status, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
+    ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -94,7 +95,11 @@ pub fn run() {
             load_profiles,
             select_profile,
             get_active_profile,
-            apply_profile_to_text
+            apply_profile_to_text,
+            load_settings,
+            save_settings,
+            save_profiles,
+            validate_shortcut_conflict
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

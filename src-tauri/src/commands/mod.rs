@@ -2,6 +2,7 @@ pub mod audio;
 pub mod clipboard;
 pub mod encoder;
 pub mod profiles;
+pub mod settings;
 pub mod shortcut;
 pub mod system_tray;
 pub mod whisper;
@@ -17,6 +18,7 @@ pub use encoder::{encode_wav_to_ogg, get_encoder_info};
 pub use profiles::{
     apply_profile_to_text, get_active_profile, load_profiles, select_profile, ProfileAppState,
 };
+pub use settings::{load_settings, save_profiles, save_settings, validate_shortcut_conflict};
 pub use shortcut::{
     auto_init_shortcut_mgr, check_shortcut_available, get_shortcut_status, init_shortcut_mgr,
     register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
