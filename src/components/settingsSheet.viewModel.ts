@@ -40,6 +40,7 @@ interface SettingsSheetActions {
   saveProfile: (profile: Profile) => void
   deleteProfile: (profileId: string) => void
   toggleProfileVisibility: (profileId: string, visible: boolean) => void
+  reorderProfiles: (activeId: string, overId: string) => void
 
   // Utility actions
   captureShortcut: () => void
@@ -439,6 +440,45 @@ export function useSettingsSheetViewModel(onClose: () => void) {
         console.error('Failed to toggle profile visibility:', error)
         setSaveError(
           error instanceof Error ? error.message : 'Failed to update profile'
+        )
+      }
+    },
+    reorderProfiles: async (activeId: string, overId: string) => {
+      try {
+        // Find the indices of the profiles being reordered
+        const activeIndex = profiles.findIndex((p) => p.id === activeId)
+        const overIndex = profiles.findIndex((p) => p.id === overId)
+
+        if (activeIndex === -1 || overIndex === -1) return
+
+        // Create a new array with the reordered profiles
+        const reorderedProfiles = [...profiles]
+        const [movedProfile] = reorderedProfiles.splice(activeIndex, 1)
+        reorderedProfiles.splice(overIndex, 0, movedProfile)
+
+        // Update timestamps for the moved profiles
+        const updatedProfiles = reorderedProfiles.map((profile) => ({
+          ...profile,
+          updated_at: new Date().toISOString(),
+        }))
+
+        const profileCollection = {
+          profiles: updatedProfiles,
+          default_profile_id:
+            profiles.find((p) => p.active)?.id || updatedProfiles[0]?.id || '',
+        }
+
+        await invoke('save_profiles', { profiles: profileCollection })
+
+        // Reload profiles to sync with backend
+        await loadProfiles()
+
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 2000)
+      } catch (error) {
+        console.error('Failed to reorder profiles:', error)
+        setSaveError(
+          error instanceof Error ? error.message : 'Failed to reorder profiles'
         )
       }
     },

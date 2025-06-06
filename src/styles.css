@@ -644,22 +644,65 @@
   padding: 8px;
   border-radius: 4px;
   transition: all 0.2s ease;
-  cursor: move;
+  cursor: grab;
+  transform-origin: center;
+  will-change: transform, opacity;
 }
 
-.profile-row:hover {
+.profile-row:hover:not(.dragging) {
   background: rgba(0, 255, 204, 0.1);
   box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
+  border-color: rgba(0, 255, 204, 0.2);
+}
+
+.profile-row:active {
+  cursor: grabbing;
+}
+
+.profile-row:not(.dragging) {
+  transition:
+    transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .drag-handle {
   color: #00ffcc;
-  cursor: move;
+  cursor: grab;
   opacity: 0.7;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
 .drag-handle:hover {
   opacity: 1;
+  background: rgba(0, 255, 204, 0.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Visual feedback for drag target */
+.profiles-list {
+  position: relative;
+}
+
+/* Accessibility improvements */
+.drag-handle[aria-pressed='true'] {
+  background: rgba(0, 255, 204, 0.2);
+  color: #00ffcc;
+}
+
+/* Focus states for keyboard navigation */
+.drag-handle:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
+  background: rgba(0, 255, 204, 0.1);
 }
 
 .profile-name {
@@ -719,149 +762,6 @@
   background: linear-gradient(145deg, #004d42, #003329) !important;
   box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
   transform: scale(1.05);
-}
-
-/* Profile Editor Styles */
-.profile-editor {
-  padding: 20px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.editor-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.editor-header h3 {
-  font-family: 'Orbitron', monospace;
-  font-weight: 700;
-  font-size: 20px;
-  color: #00ffcc;
-  letter-spacing: 1px;
-}
-
-.back-button {
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a) !important;
-  border: 1px solid #00ffcc !important;
-  color: #00ffcc !important;
-  width: 36px !important;
-  height: 36px !important;
-  padding: 0 !important;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.back-button:hover {
-  background: linear-gradient(145deg, #333, #222) !important;
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-  transform: scale(1.05);
-}
-
-.editor-form {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow-y: auto;
-}
-
-.editor-form input,
-.editor-form textarea {
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a) !important;
-  border: 1px solid #444 !important;
-  color: #00ffcc !important;
-  font-family: 'Orbitron', monospace;
-  border-radius: 4px;
-}
-
-.editor-form input:focus,
-.editor-form textarea:focus {
-  border-color: #00ffcc !important;
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3) !important;
-}
-
-.editor-form input.error,
-.editor-form textarea.error {
-  border-color: #ff0033 !important;
-  box-shadow: 0 0 10px rgba(255, 0, 51, 0.3) !important;
-}
-
-.error-text {
-  font-family: 'Orbitron', monospace;
-  font-size: 11px;
-  color: #ff0033;
-  text-shadow: 0 0 4px rgba(255, 0, 51, 0.5);
-}
-
-.shortcut-field {
-  max-width: 120px;
-}
-
-.toggle-group {
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.editor-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #333;
-}
-
-.save-button {
-  flex: 1;
-  background: linear-gradient(145deg, #003d33, #002622) !important;
-  border: 2px solid #00ffcc !important;
-  color: #00ffcc !important;
-  font-family: 'Orbitron', monospace;
-  font-weight: 600;
-  padding: 12px !important;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.save-button:hover {
-  background: linear-gradient(145deg, #004d42, #003329) !important;
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-  transform: scale(1.05);
-}
-
-.delete-button {
-  flex: 1;
-  background: linear-gradient(145deg, #300000, #200000) !important;
-  border: 2px solid #ff0033 !important;
-  color: #ff0033 !important;
-  font-family: 'Orbitron', monospace;
-  font-weight: 600;
-  padding: 12px !important;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  box-shadow: 0 0 15px rgba(255, 0, 51, 0.2);
-}
-
-.delete-button:hover {
-  background: linear-gradient(145deg, #400000, #300000) !important;
-  box-shadow: 0 0 25px rgba(255, 0, 51, 0.4);
-  transform: scale(1.05);
-}
-
-/* Responsive adjustments */
-@media (max-width: 480px) {
-  .settings-sheet {
-    width: 100% !important;
-  }
-
-  .shortcut-input-group,
-  .api-key-group {
-    flex-direction: column;
-  }
 }
 
 /* Settings window styles for detached window */
@@ -1016,5 +916,223 @@
   }
   50% {
     opacity: 1;
+  }
+}
+
+/* Drag and Drop Styles */
+.profile-row.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+  z-index: 1000;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  cursor: grab;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.profile-row:hover:not(.dragging) {
+  background: rgba(0, 255, 204, 0.1);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
+  border-color: rgba(0, 255, 204, 0.2);
+}
+
+.profile-row:active {
+  cursor: grabbing;
+}
+
+.profile-row:not(.dragging) {
+  transition:
+    transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28),
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.drag-handle {
+  color: #00ffcc;
+  cursor: grab;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.drag-handle:hover {
+  opacity: 1;
+  background: rgba(0, 255, 204, 0.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Visual feedback for drag target */
+.profiles-list {
+  position: relative;
+}
+
+/* Accessibility improvements */
+.drag-handle[aria-pressed='true'] {
+  background: rgba(0, 255, 204, 0.2);
+  color: #00ffcc;
+}
+
+/* Focus states for keyboard navigation */
+.drag-handle:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
+  background: rgba(0, 255, 204, 0.1);
+}
+
+/* Profile Editor Styles */
+.profile-editor {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.editor-header h3 {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 20px;
+  color: #00ffcc;
+  letter-spacing: 1px;
+}
+
+.back-button {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a) !important;
+  border: 1px solid #00ffcc !important;
+  color: #00ffcc !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background: linear-gradient(145deg, #333, #222) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+  transform: scale(1.05);
+}
+
+.editor-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.editor-form input,
+.editor-form textarea {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a) !important;
+  border: 1px solid #444 !important;
+  color: #00ffcc !important;
+  font-family: 'Orbitron', monospace;
+  border-radius: 4px;
+}
+
+.editor-form input:focus,
+.editor-form textarea:focus {
+  border-color: #00ffcc !important;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3) !important;
+}
+
+.editor-form input.error,
+.editor-form textarea.error {
+  border-color: #ff0033 !important;
+  box-shadow: 0 0 10px rgba(255, 0, 51, 0.3) !important;
+}
+
+.error-text {
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  color: #ff0033;
+  text-shadow: 0 0 4px rgba(255, 0, 51, 0.5);
+}
+
+.shortcut-field {
+  max-width: 120px;
+}
+
+.toggle-group {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #333;
+}
+
+.save-button {
+  flex: 1;
+  background: linear-gradient(145deg, #003d33, #002622) !important;
+  border: 2px solid #00ffcc !important;
+  color: #00ffcc !important;
+  font-family: 'Orbitron', monospace;
+  font-weight: 600;
+  padding: 12px !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.save-button:hover {
+  background: linear-gradient(145deg, #004d42, #003329) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+  transform: scale(1.05);
+}
+
+.delete-button {
+  flex: 1;
+  background: linear-gradient(145deg, #300000, #200000) !important;
+  border: 2px solid #ff0033 !important;
+  color: #ff0033 !important;
+  font-family: 'Orbitron', monospace;
+  font-weight: 600;
+  padding: 12px !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 15px rgba(255, 0, 51, 0.2);
+}
+
+.delete-button:hover {
+  background: linear-gradient(145deg, #400000, #300000) !important;
+  box-shadow: 0 0 25px rgba(255, 0, 51, 0.4);
+  transform: scale(1.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .settings-sheet {
+    width: 100% !important;
+  }
+
+  .shortcut-input-group,
+  .api-key-group {
+    flex-direction: column;
   }
 }

@@ -12,16 +12,98 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import ProfileEditor from './ProfileEditor'
 import { useSettingsSheetViewModel } from './settingsSheet.viewModel'
+import { Profile } from '@/contexts/ProfileContext'
 
 interface SettingsSheetProps {
   onClose: () => void
 }
 
+interface SortableProfileRowProps {
+  profile: Profile
+  visibleProfilesCount: number
+  onToggleVisibility: (profileId: string, visible: boolean) => void
+  onEdit: (profile: Profile) => void
+}
+
+function SortableProfileRow({
+  profile,
+  visibleProfilesCount,
+  onToggleVisibility,
+  onEdit,
+}: SortableProfileRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: profile.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`profile-row ${isDragging ? 'dragging' : ''}`}
+    >
+      <div className="drag-handle" {...attributes} {...listeners}>
+        <Move size={14} />
+      </div>
+      <span className="profile-name">{profile.name || 'Untitled'}</span>
+      <div className="profile-controls">
+        <div className="visible-checkbox">
+          <Checkbox
+            checked={profile.visible || false}
+            onCheckedChange={(checked) =>
+              onToggleVisibility(profile.id, checked as boolean)
+            }
+            disabled={!profile.visible && visibleProfilesCount >= 5}
+            className={
+              !profile.visible && visibleProfilesCount >= 5
+                ? 'disabled-checkbox'
+                : ''
+            }
+          />
+          {profile.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="edit-button"
+          onClick={() => onEdit(profile)}
+        >
+          <Edit size={12} />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
   const { state, actions, onMount } = useSettingsSheetViewModel(onClose)
   useEffect(onMount, [])
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    actions.reorderProfiles(String(active.id), String(over.id))
+  }
 
   // Show loading state while data is loading
   if (state.isLoadingSettings || state.isLoadingProfiles) {
@@ -159,52 +241,27 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
 
           <div className="profiles-section">
             <label>Profiles ({state.visibleProfilesCount}/5 visible)</label>
-            <div className="profiles-list">
-              {state.profiles.map((profile) => (
-                <div key={profile.id} className="profile-row">
-                  <div className="drag-handle">
-                    <Move size={14} />
-                  </div>
-                  <span className="profile-name">
-                    {profile.name || 'Untitled'}
-                  </span>
-                  <div className="profile-controls">
-                    <div className="visible-checkbox">
-                      <Checkbox
-                        checked={profile.visible || false}
-                        onCheckedChange={(checked) =>
-                          actions.toggleProfileVisibility(
-                            profile.id,
-                            checked as boolean
-                          )
-                        }
-                        disabled={
-                          !profile.visible && state.visibleProfilesCount >= 5
-                        }
-                        className={
-                          !profile.visible && state.visibleProfilesCount >= 5
-                            ? 'disabled-checkbox'
-                            : ''
-                        }
-                      />
-                      {profile.visible ? (
-                        <Eye size={12} />
-                      ) : (
-                        <EyeOff size={12} />
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="edit-button"
-                      onClick={() => actions.navigateToEditor(profile)}
-                    >
-                      <Edit size={12} />
-                    </Button>
-                  </div>
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={state.profiles.map((p) => p.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="profiles-list">
+                  {state.profiles.map((profile) => (
+                    <SortableProfileRow
+                      key={profile.id}
+                      profile={profile}
+                      visibleProfilesCount={state.visibleProfilesCount}
+                      onToggleVisibility={actions.toggleProfileVisibility}
+                      onEdit={actions.navigateToEditor}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           </div>
 
           <Button
