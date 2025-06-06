@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ArrowLeft,
   Plus,
@@ -27,11 +27,18 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
   const [view, setView] = useState<'overview' | 'editor'>('overview')
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [settings, setSettings] = useState<SettingsConfig | null>(null)
+  const [originalSettings, setOriginalSettings] =
+    useState<SettingsConfig | null>(null)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [isTestingApiKey, setIsTestingApiKey] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Ref to track if we're currently saving to prevent unnecessary dirty state updates
+  const isSavingRef = useRef(false)
 
   const {
     profiles,
@@ -40,10 +47,73 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
     loadProfiles,
   } = useProfiles()
 
+  // Check if settings have changed (dirty state)
+  const checkForChanges = useCallback(
+    (
+      currentSettings: SettingsConfig | null,
+      original: SettingsConfig | null
+    ) => {
+      if (!currentSettings || !original || isSavingRef.current) return false
+
+      return JSON.stringify(currentSettings) !== JSON.stringify(original)
+    },
+    []
+  )
+
+  // Update dirty state when settings change
+  useEffect(() => {
+    const hasChanges = checkForChanges(settings, originalSettings)
+    setHasUnsavedChanges(hasChanges)
+  }, [settings, originalSettings, checkForChanges])
+
   // Load settings data on component mount
   useEffect(() => {
     loadSettingsData()
   }, [])
+
+  const handleClose = useCallback(() => {
+    if (hasUnsavedChanges) {
+      const shouldDiscard = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      )
+      if (!shouldDiscard) return
+    }
+    onClose()
+  }, [hasUnsavedChanges, onClose])
+
+  // Prevent accidental data loss
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Don't show modal if we're currently saving or if there are no unsaved changes
+      if (isSavingRef.current || !hasUnsavedChanges) {
+        return
+      }
+
+      e.preventDefault()
+      e.returnValue =
+        'You have unsaved changes. Are you sure you want to leave?'
+      return e.returnValue
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (view === 'editor') {
+          setView('overview')
+          setEditingProfile(null)
+        } else {
+          handleClose()
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [hasUnsavedChanges, view, handleClose])
 
   const loadSettingsData = async () => {
     try {
@@ -54,6 +124,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
       const settingsData = await invoke<SettingsConfig>('load_settings')
       console.log('Loaded settings:', settingsData)
       setSettings(settingsData)
+      setOriginalSettings(JSON.parse(JSON.stringify(settingsData))) // Deep copy
     } catch (error) {
       console.error('Failed to load settings:', error)
       setSettingsError(
@@ -61,7 +132,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
       )
 
       // Create default settings if loading fails
-      setSettings({
+      const defaultSettings = {
         whisper: {
           api_key: '',
           endpoint: 'https://api.openai.com/v1/audio/transcriptions',
@@ -83,23 +154,60 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
           auto_start_recording: false,
         },
         global_shortcut: 'CmdOrCtrl+Shift+F9',
-      })
+      }
+      setSettings(defaultSettings)
+      setOriginalSettings(JSON.parse(JSON.stringify(defaultSettings)))
     } finally {
       setIsLoadingSettings(false)
     }
   }
 
-  const handleSaveSettings = async () => {
+  const handleSaveSettings = async (e?: React.MouseEvent) => {
+    // Prevent any default button behavior
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
     if (!settings) return
 
     try {
+      isSavingRef.current = true
       setIsSaving(true)
       setSaveError(null)
       setSaveSuccess(false)
 
       console.log('Saving settings:', settings)
+
+      // Check if global shortcut changed
+      const shortcutChanged =
+        originalSettings &&
+        settings.global_shortcut !== originalSettings.global_shortcut
+
+      // Save settings to backend
       const result = await invoke<string>('save_settings', { settings })
       console.log('Save result:', result)
+
+      // If global shortcut changed, update it immediately
+      if (shortcutChanged) {
+        try {
+          console.log('Updating global shortcut to:', settings.global_shortcut)
+          await invoke<string>('update_global_shortcut', {
+            newShortcut: settings.global_shortcut,
+          })
+          console.log('Global shortcut updated successfully')
+        } catch (shortcutError) {
+          console.error('Failed to update global shortcut:', shortcutError)
+          setSaveError(
+            shortcutError instanceof Error
+              ? `Settings saved but failed to update global shortcut: ${shortcutError.message}`
+              : 'Settings saved but failed to update global shortcut'
+          )
+        }
+      }
+
+      // Update original settings to current settings (reset dirty state)
+      setOriginalSettings(JSON.parse(JSON.stringify(settings)))
 
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000) // Clear success message after 3 seconds
@@ -109,7 +217,38 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
         error instanceof Error ? error.message : 'Failed to save settings'
       )
     } finally {
+      isSavingRef.current = false
       setIsSaving(false)
+    }
+  }
+
+  const handleTestApiKey = async () => {
+    if (!settings?.whisper.api_key) {
+      setSaveError('Please enter an API key first')
+      return
+    }
+
+    try {
+      setIsTestingApiKey(true)
+      setSaveError(null)
+
+      // Test API key by making a simple request
+      // TODO: Implement actual API key testing via IPC command
+      console.log(
+        'Testing API key:',
+        settings.whisper.api_key.substring(0, 10) + '...'
+      )
+
+      // For now, just simulate a test
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (error) {
+      console.error('API key test failed:', error)
+      setSaveError('API key test failed')
+    } finally {
+      setIsTestingApiKey(false)
     }
   }
 
@@ -243,22 +382,6 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
     }
   }
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (view === 'editor') {
-          setView('overview')
-          setEditingProfile(null)
-        } else {
-          onClose()
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [view, onClose])
-
   // Show loading state while data is loading
   if (isLoadingSettings || isLoadingProfiles) {
     return (
@@ -310,6 +433,12 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
     <div className="settings-content">
       <div className="settings-header">
         <h2>SETTINGS</h2>
+        {hasUnsavedChanges && (
+          <div className="unsaved-indicator">
+            <AlertCircle size={16} />
+            <span>Unsaved changes</span>
+          </div>
+        )}
       </div>
 
       {/* Error Messages */}
@@ -339,119 +468,148 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
       )}
 
       <div className="settings-form">
-        <div className="form-group">
-          <label>Global Shortcut</label>
-          <div className="shortcut-input-group">
-            <Input
-              value={settings?.global_shortcut || ''}
-              onChange={(e) =>
-                setSettings((prev) =>
-                  prev ? { ...prev, global_shortcut: e.target.value } : null
-                )
-              }
-              placeholder="Press keys..."
-              className="shortcut-input"
-            />
-            <Button
-              className="capture-button"
-              onClick={() => {
-                // TODO: Implement shortcut capture functionality
-                console.log('Capture shortcut clicked')
-              }}
-            >
-              Capture
-            </Button>
+        <form onSubmit={(e) => e.preventDefault()}>
+          <div className="form-group">
+            <label>Global Shortcut</label>
+            <div className="shortcut-input-group">
+              <Input
+                value={settings?.global_shortcut || ''}
+                onChange={(e) =>
+                  setSettings((prev) =>
+                    prev ? { ...prev, global_shortcut: e.target.value } : null
+                  )
+                }
+                placeholder="Press keys..."
+                className="shortcut-input"
+              />
+              <Button
+                type="button"
+                className="capture-button"
+                onClick={() => {
+                  // TODO: Implement shortcut capture functionality
+                  console.log('Capture shortcut clicked')
+                }}
+              >
+                Capture
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="form-group">
-          <label>OpenAI API Key</label>
-          <div className="api-key-group">
-            <Input
-              type="password"
-              value={settings?.whisper.api_key || ''}
-              onChange={(e) =>
-                setSettings((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        whisper: { ...prev.whisper, api_key: e.target.value },
-                      }
-                    : null
-                )
-              }
-              placeholder="sk-..."
-              className="api-key-input"
-            />
-            <Button className="test-button">
-              <TestTube size={16} />
-              Test
-            </Button>
+          <div className="form-group">
+            <label>OpenAI API Key</label>
+            <div className="api-key-group">
+              <Input
+                type="password"
+                value={settings?.whisper.api_key || ''}
+                onChange={(e) =>
+                  setSettings((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          whisper: { ...prev.whisper, api_key: e.target.value },
+                        }
+                      : null
+                  )
+                }
+                placeholder="sk-..."
+                className="api-key-input"
+              />
+              <Button
+                type="button"
+                className="test-button"
+                onClick={handleTestApiKey}
+                disabled={isTestingApiKey || !settings?.whisper.api_key}
+              >
+                {isTestingApiKey ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <TestTube size={16} />
+                    Test
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="profiles-section">
-          <label>Profiles ({visibleProfilesCount}/5 visible)</label>
-          <div className="profiles-list">
-            {profiles.map((profile) => (
-              <div key={profile.id} className="profile-row">
-                <div className="drag-handle">
-                  <Move size={14} />
-                </div>
-                <span className="profile-name">
-                  {profile.name || 'Untitled'}
-                </span>
-                <div className="profile-controls">
-                  <div className="visible-checkbox">
-                    <Checkbox
-                      checked={profile.visible || false}
-                      onCheckedChange={(checked) =>
-                        handleToggleVisible(profile.id, checked as boolean)
-                      }
-                      disabled={!profile.visible && visibleProfilesCount >= 5}
-                      className={
-                        !profile.visible && visibleProfilesCount >= 5
-                          ? 'disabled-checkbox'
-                          : ''
-                      }
-                    />
-                    {profile.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+          <div className="profiles-section">
+            <label>Profiles ({visibleProfilesCount}/5 visible)</label>
+            <div className="profiles-list">
+              {profiles.map((profile) => (
+                <div key={profile.id} className="profile-row">
+                  <div className="drag-handle">
+                    <Move size={14} />
                   </div>
-                  <Button
-                    size="sm"
-                    className="edit-button"
-                    onClick={() => handleEditProfile(profile)}
-                  >
-                    <Edit size={12} />
-                  </Button>
+                  <span className="profile-name">
+                    {profile.name || 'Untitled'}
+                  </span>
+                  <div className="profile-controls">
+                    <div className="visible-checkbox">
+                      <Checkbox
+                        checked={profile.visible || false}
+                        onCheckedChange={(checked) =>
+                          handleToggleVisible(profile.id, checked as boolean)
+                        }
+                        disabled={!profile.visible && visibleProfilesCount >= 5}
+                        className={
+                          !profile.visible && visibleProfilesCount >= 5
+                            ? 'disabled-checkbox'
+                            : ''
+                        }
+                      />
+                      {profile.visible ? (
+                        <Eye size={12} />
+                      ) : (
+                        <EyeOff size={12} />
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="edit-button"
+                      onClick={() => handleEditProfile(profile)}
+                    >
+                      <Edit size={12} />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <Button className="add-profile-button" onClick={handleAddProfile}>
-          <Plus size={16} />
-          Add Profile
-        </Button>
-
-        {/* Save Settings Button */}
-        <div className="settings-actions">
           <Button
-            className="save-settings-button"
-            onClick={handleSaveSettings}
-            disabled={isSaving || !settings}
+            type="button"
+            className="add-profile-button"
+            onClick={handleAddProfile}
           >
-            {isSaving ? (
-              <>
-                <Loader2 className="animate-spin" size={16} />
-                Saving...
-              </>
-            ) : (
-              'Save Settings'
-            )}
+            <Plus size={16} />
+            Add Profile
           </Button>
-        </div>
+
+          {/* Save Settings Button */}
+          <div className="settings-actions">
+            <Button
+              type="button"
+              className={`save-settings-button ${
+                hasUnsavedChanges ? 'has-changes' : ''
+              }`}
+              onClick={handleSaveSettings}
+              disabled={isSaving || !settings || !hasUnsavedChanges}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Saving...
+                </>
+              ) : (
+                'Save Settings'
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   )
