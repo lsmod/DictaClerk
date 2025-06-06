@@ -1,5 +1,5 @@
 pub mod audio;
-mod commands;
+pub mod commands;
 pub mod config;
 pub mod services;
 
@@ -16,8 +16,9 @@ use commands::{
     toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
     transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
     unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
-    update_tray_status, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
-    ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
+    update_tray_status, v1_save_profiles, v1_save_settings, validate_shortcut_conflict,
+    AudioCaptureState, ClipboardServiceState, ProfileAppState, ShortcutMgrState, SystemTrayState,
+    WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -99,7 +100,9 @@ pub fn run() {
             load_settings,
             save_settings,
             save_profiles,
-            validate_shortcut_conflict
+            validate_shortcut_conflict,
+            v1_save_settings,
+            v1_save_profiles
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
