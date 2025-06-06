@@ -880,11 +880,57 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  position: relative;
+  min-height: 20px; /* Ensure consistent height for touch targets */
+}
+
+.visible-checkbox > * {
+  pointer-events: auto;
+}
+
+.visible-checkbox [data-radix-checkbox-root] {
+  margin: 2px; /* Add slight margin for better touch target */
 }
 
 .disabled-checkbox {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
+}
+
+.visibility-limit-indicator {
+  color: #00aaff;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 2px;
+  cursor: help;
+  text-shadow: 0 0 2px rgba(0, 170, 255, 0.5);
+  animation: rotate-hint 3s ease-in-out infinite;
+}
+
+@keyframes rotate-hint {
+  0%,
+  90%,
+  100% {
+    transform: rotate(0deg);
+  }
+  5%,
+  85% {
+    transform: rotate(360deg);
+  }
+}
+
+.visibility-limit-warning {
+  background: linear-gradient(145deg, #152025, #0a1a1a);
+  border: 1px solid rgba(0, 170, 255, 0.5);
+  border-radius: 4px;
+  color: #00aaff;
+  font-size: 11px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .edit-button {

@@ -536,11 +536,33 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     toggleProfileVisibility: async (profileId: string, visible: boolean) => {
       const visibleCount = profiles.filter((p) => p.visible).length
 
-      // Check if we're trying to make visible but already at limit
-      if (visible && visibleCount >= 5) return
-
       try {
-        const updatedProfiles = profiles.map((p) =>
+        let updatedProfiles = [...profiles]
+
+        if (visible && visibleCount >= 5) {
+          // If trying to make visible but already at limit, hide the oldest visible profile first
+          const visibleProfiles = profiles.filter(
+            (p) => p.visible && p.id !== profileId
+          )
+          if (visibleProfiles.length > 0) {
+            // Find the profile that was updated longest ago (oldest)
+            const oldestVisible = visibleProfiles.reduce((oldest, current) => {
+              return new Date(current.updated_at) < new Date(oldest.updated_at)
+                ? current
+                : oldest
+            })
+
+            // Hide the oldest visible profile
+            updatedProfiles = updatedProfiles.map((p) =>
+              p.id === oldestVisible.id
+                ? { ...p, visible: false, updated_at: new Date().toISOString() }
+                : p
+            )
+          }
+        }
+
+        // Now update the target profile
+        updatedProfiles = updatedProfiles.map((p) =>
           p.id === profileId
             ? { ...p, visible, updated_at: new Date().toISOString() }
             : p

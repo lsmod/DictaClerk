@@ -145,25 +145,33 @@ function SortableProfileRow({
             onCheckedChange={(checked) =>
               onToggleVisibility(profile.id, checked as boolean)
             }
-            disabled={!profile.visible && visibleProfilesCount >= 5}
-            className={
-              !profile.visible && visibleProfilesCount >= 5
-                ? 'disabled-checkbox'
-                : ''
-            }
             aria-label={`${profile.visible ? 'Hide' : 'Show'} ${
               profile.name || 'Untitled'
-            } profile`}
-            aria-describedby={
+            } profile${
               !profile.visible && visibleProfilesCount >= 5
-                ? 'visibility-limit-notice'
-                : undefined
+                ? ' (will auto-hide oldest visible profile)'
+                : ''
+            }`}
+            title={
+              !profile.visible && visibleProfilesCount >= 5
+                ? 'Will automatically hide the oldest visible profile to make room'
+                : profile.visible
+                  ? `Hide ${profile.name || 'Untitled'} profile`
+                  : `Show ${profile.name || 'Untitled'} profile`
             }
           />
           {profile.visible ? (
-            <Eye size={12} aria-hidden="true" />
+            <Eye size={10} aria-hidden="true" />
           ) : (
-            <EyeOff size={12} aria-hidden="true" />
+            <EyeOff size={10} aria-hidden="true" />
+          )}
+          {!profile.visible && visibleProfilesCount >= 5 && (
+            <span
+              className="visibility-limit-indicator"
+              title="Will auto-hide oldest visible profile"
+            >
+              ↻
+            </span>
           )}
         </div>
         <Button
@@ -471,9 +479,12 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
                 Profiles ({state.visibleProfilesCount}/5 visible)
               </label>
               {state.visibleProfilesCount >= 5 && (
-                <div id="visibility-limit-notice" className="sr-only">
-                  Maximum of 5 profiles can be visible at once. Hide other
-                  profiles to show more.
+                <div
+                  id="visibility-limit-notice"
+                  className="visibility-limit-warning"
+                >
+                  ℹ️ Showing 5 profiles (maximum). Making another profile
+                  visible will auto-hide the oldest one.
                 </div>
               )}
             </div>
