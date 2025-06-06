@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { Profile } from '@/contexts/ProfileContext'
 
 interface ProfileEditorState {
@@ -20,6 +21,43 @@ interface ProfileEditorActions {
   navigateBack: () => void
 }
 
+// Window-level view model
+export function useProfileEditorWindowViewModel() {
+  const closeProfileEditor = useCallback(() => {
+    invoke('close_profile_editor_window').catch(console.error)
+  }, [])
+
+  const handleProfileEditorEvents = useCallback(() => {
+    // Profile editor window specific logic can be added here
+    console.log('Profile editor window mounted')
+  }, [])
+
+  const setupEventListeners = useCallback(() => {
+    window.addEventListener('profile-editor-events', handleProfileEditorEvents)
+
+    return () => {
+      window.removeEventListener(
+        'profile-editor-events',
+        handleProfileEditorEvents
+      )
+    }
+  }, [handleProfileEditorEvents])
+
+  const onMount = useCallback(() => {
+    const cleanup = setupEventListeners()
+    return cleanup
+  }, [setupEventListeners])
+
+  return {
+    state: {},
+    actions: {
+      closeProfileEditor,
+    },
+    onMount,
+  }
+}
+
+// Component-level view model
 export function useProfileEditorViewModel(
   profile: Profile,
   onSave: (profile: Profile) => void,

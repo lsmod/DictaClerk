@@ -16,7 +16,7 @@ import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import ProfileEditor from './ProfileEditor'
+import ProfileEditorWindow from '../windows/ProfileEditorWindow'
 import { useSettingsSheetViewModel } from './settingsSheet.viewModel'
 import { Profile } from '@/contexts/ProfileContext'
 
@@ -296,7 +296,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
 
   if (state.view === 'editor' && state.editingProfile) {
     return (
-      <ProfileEditor
+      <ProfileEditorWindow
         profile={state.editingProfile}
         onSave={actions.saveProfile}
         onDelete={actions.deleteProfile}
