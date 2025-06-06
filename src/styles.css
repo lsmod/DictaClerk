@@ -875,15 +875,92 @@
   width: 100%;
 }
 
-/* Ensure settings sheet works in detached window */
-.settings-window .settings-sheet {
-  position: static;
-  transform: none;
+/* Loading and error states for settings */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: #00ffcc;
+  font-family: 'Orbitron', monospace;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 20px;
+  color: #ff0033;
+  font-family: 'Orbitron', monospace;
+  text-align: center;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 0, 51, 0.1);
+  border: 1px solid rgba(255, 0, 51, 0.3);
+  border-radius: 6px;
+  color: #ff0033;
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 255, 204, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 6px;
+  color: #00ffcc;
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+/* Settings actions */
+.settings-actions {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #333;
+}
+
+.save-settings-button {
   width: 100%;
-  height: auto;
-  max-width: none;
-  border: none;
-  background: transparent;
+  background: linear-gradient(145deg, #003d33, #002622) !important;
+  border: 2px solid #00ffcc !important;
+  color: #00ffcc !important;
+  font-family: 'Orbitron', monospace;
+  font-weight: 600;
+  padding: 14px !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.save-settings-button:hover {
+  background: linear-gradient(145deg, #004d42, #003329) !important;
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.4);
+  transform: scale(1.02);
+}
+
+.save-settings-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Screen reader only content - accessible but visually hidden */
