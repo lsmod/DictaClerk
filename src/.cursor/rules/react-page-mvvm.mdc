@@ -16,7 +16,7 @@ alwaysApply: false
 ```tsx
 // src/pages/LoginPage.tsx
 import { useEffect } from "react";
-import { useLoginPageViewModel } from "./LoginPageViewModel";
+import { useLoginPageViewModel } from "./loginPage.viewModel";
 
 export default function LoginPage() {
   const { state, actions, onMount } = useLoginPageViewModel();
