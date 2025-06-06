@@ -624,6 +624,61 @@
   transform: scale(1.05);
 }
 
+/* Shortcut input states */
+.shortcut-input.error {
+  border-color: #ff0033 !important;
+  box-shadow: 0 0 10px rgba(255, 0, 51, 0.3) !important;
+}
+
+.shortcut-input.capturing {
+  border-color: #ffaa00 !important;
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.4) !important;
+  background: linear-gradient(145deg, #2a2a1a, #1a1a0a) !important;
+}
+
+.capture-button.capturing {
+  background: linear-gradient(145deg, #ff6600, #cc4400) !important;
+  color: #ffffff !important;
+  border-color: #ff6600 !important;
+  box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
+}
+
+.capture-button.capturing:hover {
+  background: linear-gradient(145deg, #ff7700, #dd5500) !important;
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.7);
+}
+
+/* Validation feedback */
+.validation-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Orbitron', monospace;
+  font-size: 11px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.validation-feedback.error {
+  color: #ff0033;
+  background: rgba(255, 0, 51, 0.1);
+  border: 1px solid rgba(255, 0, 51, 0.3);
+}
+
+.validation-feedback.validating {
+  color: #ffaa00;
+  background: rgba(255, 170, 0, 0.1);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.validation-feedback.info {
+  color: #00aaff;
+  background: rgba(0, 170, 255, 0.1);
+  border: 1px solid rgba(0, 170, 255, 0.3);
+}
+
 .profiles-section {
   flex: 1;
 }

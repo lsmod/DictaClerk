@@ -19,6 +19,12 @@ interface SettingsSheetState {
   isLoadingProfiles: boolean
   profilesError: string | null
   visibleProfilesCount: number
+  shortcutValidation: {
+    isValidating: boolean
+    isValid: boolean
+    error: string | null
+  }
+  isCapturingShortcut: boolean
 }
 
 interface SettingsSheetActions {
@@ -60,8 +66,22 @@ export function useSettingsSheetViewModel(onClose: () => void) {
   const [isTestingApiKey, setIsTestingApiKey] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
+  const [shortcutValidation, setShortcutValidation] = useState<{
+    isValidating: boolean
+    isValid: boolean
+    error: string | null
+  }>({
+    isValidating: false,
+    isValid: true,
+    error: null,
+  })
+  const [isCapturingShortcut, setIsCapturingShortcut] = useState(false)
+
   // Ref to track if we're currently saving to prevent unnecessary dirty state updates
   const isSavingRef = useRef(false)
+
+  // Ref for validation debouncing
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const {
     profiles,
@@ -71,6 +91,67 @@ export function useSettingsSheetViewModel(onClose: () => void) {
   } = useProfiles()
 
   const visibleProfilesCount = profiles.filter((p) => p.visible).length
+
+  // Shortcut validation function
+  const validateShortcutRealTime = useCallback(async (shortcut: string) => {
+    if (!shortcut.trim()) {
+      return { isValid: true, error: null }
+    }
+
+    try {
+      setShortcutValidation((prev) => ({ ...prev, isValidating: true }))
+
+      const isValid = await invoke<boolean>('validate_shortcut_conflict', {
+        shortcut,
+      })
+
+      return {
+        isValid,
+        error: isValid ? null : 'Shortcut conflict detected',
+      }
+    } catch (error) {
+      console.error('Validation failed:', error)
+      return {
+        isValid: false,
+        error: 'Validation failed',
+      }
+    }
+  }, [])
+
+  // Helper function to build shortcut string from keyboard event
+  const buildShortcutString = useCallback((e: KeyboardEvent): string => {
+    const parts: string[] = []
+
+    // Add modifiers
+    if (e.ctrlKey || e.metaKey) parts.push(e.metaKey ? 'Cmd' : 'Ctrl')
+    if (e.altKey) parts.push('Alt')
+    if (e.shiftKey) parts.push('Shift')
+
+    // Add the main key (avoid modifier keys themselves)
+    if (!['Control', 'Alt', 'Shift', 'Meta', 'Command'].includes(e.key)) {
+      // Convert special keys to proper format
+      let key = e.key
+      if (key === ' ') key = 'Space'
+      else if (key.length === 1) key = key.toUpperCase()
+
+      parts.push(key)
+    }
+
+    return parts.join('+')
+  }, [])
+
+  // Helper function to check if a shortcut is complete (has non-modifier key)
+  const isCompleteShortcut = useCallback((shortcut: string): boolean => {
+    if (!shortcut) return false
+
+    // A complete shortcut should have at least one non-modifier key
+    // Check if the shortcut contains keys other than Ctrl, Alt, Shift, Cmd
+    const parts = shortcut.split('+')
+    const modifierKeys = ['Ctrl', 'Alt', 'Shift', 'Cmd']
+    const hasNonModifier = parts.some((part) => !modifierKeys.includes(part))
+
+    return hasNonModifier
+  }, [])
 
   // Check if settings have changed (dirty state)
   const checkForChanges = useCallback(
@@ -181,6 +262,15 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     }
   }, [hasUnsavedChanges, view, handleCloseSheet])
 
+  // Cleanup validation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const state: SettingsSheetState = {
     view,
     editingProfile,
@@ -197,6 +287,8 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     isLoadingProfiles,
     profilesError,
     visibleProfilesCount,
+    shortcutValidation,
+    isCapturingShortcut,
   }
 
   const actions: SettingsSheetActions = {
@@ -235,6 +327,21 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       setSettings((prev) =>
         prev ? { ...prev, global_shortcut: shortcut } : null
       )
+
+      // Clear previous validation timeout
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current)
+      }
+
+      // Debounce validation
+      validationTimeoutRef.current = setTimeout(async () => {
+        const result = await validateShortcutRealTime(shortcut)
+        setShortcutValidation({
+          isValidating: false,
+          isValid: result.isValid,
+          error: result.error,
+        })
+      }, 500) // 500ms debounce
     },
     updateApiKey: (apiKey: string) => {
       setSettings((prev) =>
@@ -254,6 +361,12 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       }
 
       if (!settings) return
+
+      // Check if shortcut validation failed
+      if (!shortcutValidation.isValid && settings.global_shortcut) {
+        setSaveError(shortcutValidation.error || 'Invalid shortcut')
+        return
+      }
 
       try {
         isSavingRef.current = true
@@ -485,8 +598,56 @@ export function useSettingsSheetViewModel(onClose: () => void) {
 
     // Utility actions
     captureShortcut: () => {
-      // TODO: Implement shortcut capture functionality
-      console.log('Capture shortcut clicked')
+      if (isCapturingShortcut) {
+        // If already capturing, cancel capture
+        setIsCapturingShortcut(false)
+        return
+      }
+
+      setIsCapturingShortcut(true)
+      setSaveError(null) // Clear any existing errors
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+
+        const shortcut = buildShortcutString(e)
+
+        // Only accept complete shortcuts with non-modifier keys
+        if (shortcut && isCompleteShortcut(shortcut)) {
+          // Update the shortcut (this will trigger validation)
+          setSettings((prev) =>
+            prev ? { ...prev, global_shortcut: shortcut } : null
+          )
+
+          // Stop capturing
+          setIsCapturingShortcut(false)
+          document.removeEventListener('keydown', handleKeyDown)
+          document.removeEventListener('click', handleClickOutside)
+
+          // Trigger validation immediately
+          validateShortcutRealTime(shortcut).then((result) => {
+            setShortcutValidation({
+              isValidating: false,
+              isValid: result.isValid,
+              error: result.error,
+            })
+          })
+        }
+        // If shortcut is incomplete, continue capturing without stopping
+      }
+
+      const handleClickOutside = () => {
+        setIsCapturingShortcut(false)
+        document.removeEventListener('keydown', handleKeyDown)
+        document.removeEventListener('click', handleClickOutside)
+      }
+
+      document.addEventListener('keydown', handleKeyDown)
+      // Add click outside to cancel capture
+      setTimeout(() => {
+        document.addEventListener('click', handleClickOutside)
+      }, 100) // Small delay to prevent immediate cancellation
     },
   }
 

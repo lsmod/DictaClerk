@@ -193,17 +193,49 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
               <Input
                 value={state.settings?.global_shortcut || ''}
                 onChange={(e) => actions.updateGlobalShortcut(e.target.value)}
-                placeholder="Press keys..."
-                className="shortcut-input"
+                placeholder={
+                  state.isCapturingShortcut
+                    ? 'Press keys...'
+                    : 'Enter shortcut...'
+                }
+                className={`shortcut-input ${
+                  !state.shortcutValidation.isValid &&
+                  state.settings?.global_shortcut
+                    ? 'error'
+                    : ''
+                } ${state.isCapturingShortcut ? 'capturing' : ''}`}
+                readOnly={state.isCapturingShortcut}
               />
               <Button
                 type="button"
-                className="capture-button"
+                className={`capture-button ${
+                  state.isCapturingShortcut ? 'capturing' : ''
+                }`}
                 onClick={actions.captureShortcut}
               >
-                Capture
+                {state.isCapturingShortcut ? 'Cancel' : 'Capture'}
               </Button>
             </div>
+            {/* Validation feedback */}
+            {state.shortcutValidation.isValidating && (
+              <div className="validation-feedback validating">
+                <Loader2 className="animate-spin" size={12} />
+                <span>Validating shortcut...</span>
+              </div>
+            )}
+            {!state.shortcutValidation.isValid &&
+              state.settings?.global_shortcut &&
+              !state.shortcutValidation.isValidating && (
+                <div className="validation-feedback error">
+                  <AlertCircle size={12} />
+                  <span>{state.shortcutValidation.error}</span>
+                </div>
+              )}
+            {state.isCapturingShortcut && (
+              <div className="validation-feedback info">
+                <span>Press the key combination you want to use...</span>
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -282,7 +314,12 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
               }`}
               onClick={actions.saveSettings}
               disabled={
-                state.isSaving || !state.settings || !state.hasUnsavedChanges
+                state.isSaving ||
+                !state.settings ||
+                !state.hasUnsavedChanges ||
+                (!state.shortcutValidation.isValid &&
+                  Boolean(state.settings?.global_shortcut)) ||
+                state.shortcutValidation.isValidating
               }
             >
               {state.isSaving ? (
