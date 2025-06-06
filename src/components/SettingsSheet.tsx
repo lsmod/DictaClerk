@@ -31,6 +31,7 @@ interface SortableProfileRowProps {
   onEdit: (profile: Profile) => void
   onKeyboardReorder?: (profileId: string, direction: 'up' | 'down') => void
   isDragActive?: boolean
+  allProfiles: Profile[]
 }
 
 function SortableProfileRow({
@@ -40,6 +41,7 @@ function SortableProfileRow({
   onEdit,
   onKeyboardReorder,
   isDragActive = false,
+  allProfiles,
 }: SortableProfileRowProps) {
   const {
     attributes,
@@ -55,8 +57,12 @@ function SortableProfileRow({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition:
+      transition || 'transform 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
     opacity: isDragging ? 0.5 : 1,
+    rotate: isDragging ? '2deg' : '0deg',
+    scale: isDragging ? '1.02' : '1',
+    zIndex: isDragging ? 999 : 'auto',
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -106,7 +112,7 @@ function SortableProfileRow({
       style={style}
       className={`profile-row ${isDragging ? 'dragging' : ''} ${
         isKeyboardDragging ? 'keyboard-dragging' : ''
-      }`}
+      } ${isDragActive ? 'drag-active' : ''}`}
       role="listitem"
       aria-label={`Profile ${profile.name || 'Untitled'}`}
       data-dragging={isDragActive}
@@ -119,7 +125,10 @@ function SortableProfileRow({
         role="button"
         aria-label={`Reorder ${
           profile.name || 'Untitled'
-        } profile. Current position in list.`}
+        } profile. Current position ${getProfilePosition(
+          profile.id,
+          allProfiles
+        )}.`}
         aria-describedby="drag-instructions"
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -145,6 +154,11 @@ function SortableProfileRow({
             aria-label={`${profile.visible ? 'Hide' : 'Show'} ${
               profile.name || 'Untitled'
             } profile`}
+            aria-describedby={
+              !profile.visible && visibleProfilesCount >= 5
+                ? 'visibility-limit-notice'
+                : undefined
+            }
           />
           {profile.visible ? (
             <Eye size={12} aria-hidden="true" />
@@ -166,9 +180,15 @@ function SortableProfileRow({
   )
 }
 
+// Helper function to get profile position
+const getProfilePosition = (profileId: string, profiles: Profile[]): number => {
+  return profiles.findIndex((p) => p.id === profileId) + 1
+}
+
 const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
   const { state, actions, onMount } = useSettingsSheetViewModel(onClose)
   const saveButtonRef = useRef<HTMLButtonElement>(null)
+  const firstInputRef = useRef<HTMLInputElement>(null)
   const [isDragActive, setIsDragActive] = useState(false)
 
   useEffect(onMount, [])
@@ -181,6 +201,15 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
       }, 100)
     }
   }, [state.saveSuccess])
+
+  // Focus first input when creating new profile
+  useEffect(() => {
+    if (state.view === 'overview' && firstInputRef.current) {
+      setTimeout(() => {
+        firstInputRef.current?.focus()
+      }, 100)
+    }
+  }, [state.view])
 
   const handleDragStart = () => {
     setIsDragActive(true)
@@ -199,9 +228,10 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
     // Announce reorder completion to screen readers
     const activeProfile = state.profiles.find((p) => p.id === String(active.id))
     if (activeProfile) {
+      const newPosition = getProfilePosition(String(active.id), state.profiles)
       const announcement = `${
         activeProfile.name || 'Untitled'
-      } profile moved to new position`
+      } profile moved to position ${newPosition}`
       const liveRegion = document.getElementById('aria-live-region')
       if (liveRegion) {
         liveRegion.textContent = announcement
@@ -294,7 +324,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
       <div className="settings-header">
         <h2>SETTINGS</h2>
         {state.hasUnsavedChanges && (
-          <div className="unsaved-indicator">
+          <div className="unsaved-indicator" role="status" aria-live="polite">
             <AlertCircle size={16} />
             <span>Unsaved changes</span>
           </div>
@@ -303,28 +333,28 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
 
       {/* Error Messages */}
       {state.settingsError && (
-        <div className="error-message" role="alert">
+        <div className="error-message" role="alert" aria-live="assertive">
           <AlertCircle size={16} />
           Warning: {state.settingsError}
         </div>
       )}
 
       {state.profilesError && (
-        <div className="error-message" role="alert">
+        <div className="error-message" role="alert" aria-live="assertive">
           <AlertCircle size={16} />
           Profiles Error: {state.profilesError}
         </div>
       )}
 
       {state.saveError && (
-        <div className="error-message" role="alert">
+        <div className="error-message" role="alert" aria-live="assertive">
           <AlertCircle size={16} />
           Save Error: {state.saveError}
         </div>
       )}
 
       {state.saveSuccess && (
-        <div className="success-message" role="status">
+        <div className="success-message" role="status" aria-live="polite">
           Settings saved successfully!
         </div>
       )}
@@ -335,6 +365,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
             <label htmlFor="global-shortcut">Global Shortcut</label>
             <div className="shortcut-input-group">
               <Input
+                ref={firstInputRef}
                 id="global-shortcut"
                 value={state.settings?.global_shortcut || ''}
                 onChange={(e) => actions.updateGlobalShortcut(e.target.value)}
@@ -351,6 +382,10 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
                 } ${state.isCapturingShortcut ? 'capturing' : ''}`}
                 readOnly={state.isCapturingShortcut}
                 aria-describedby="shortcut-feedback"
+                aria-invalid={
+                  !state.shortcutValidation.isValid &&
+                  !!state.settings?.global_shortcut
+                }
               />
               <Button
                 type="button"
@@ -401,7 +436,11 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
                 onChange={(e) => actions.updateApiKey(e.target.value)}
                 placeholder="sk-..."
                 className="api-key-input"
+                aria-describedby="api-key-help"
               />
+              <div id="api-key-help" className="sr-only">
+                Your OpenAI API key for Whisper transcription service
+              </div>
               <Button
                 type="button"
                 className="test-button"
@@ -427,7 +466,17 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
           </div>
 
           <div className="profiles-section">
-            <label>Profiles ({state.visibleProfilesCount}/5 visible)</label>
+            <div className="profiles-header">
+              <label id="profiles-label">
+                Profiles ({state.visibleProfilesCount}/5 visible)
+              </label>
+              {state.visibleProfilesCount >= 5 && (
+                <div id="visibility-limit-notice" className="sr-only">
+                  Maximum of 5 profiles can be visible at once. Hide other
+                  profiles to show more.
+                </div>
+              )}
+            </div>
             <DndContext
               collisionDetection={closestCenter}
               onDragStart={handleDragStart}
@@ -440,7 +489,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
                 <div
                   className="profiles-list"
                   role="list"
-                  aria-label="Profiles list"
+                  aria-labelledby="profiles-label"
                   data-dragging={isDragActive}
                 >
                   {state.profiles.map((profile) => (
@@ -452,8 +501,14 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
                       onEdit={actions.navigateToEditor}
                       onKeyboardReorder={handleKeyboardReorder}
                       isDragActive={isDragActive}
+                      allProfiles={state.profiles}
                     />
                   ))}
+                  {state.profiles.length === 0 && (
+                    <div className="empty-profiles-message" role="status">
+                      No profiles yet. Create your first profile below.
+                    </div>
+                  )}
                 </div>
               </SortableContext>
             </DndContext>
@@ -489,6 +544,9 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
               aria-label={`Save settings${
                 state.hasUnsavedChanges ? ' (has unsaved changes)' : ''
               }`}
+              aria-describedby={
+                state.hasUnsavedChanges ? 'save-status' : undefined
+              }
             >
               {state.isSaving ? (
                 <>
@@ -499,6 +557,11 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
                 'Save Settings'
               )}
             </Button>
+            {state.hasUnsavedChanges && (
+              <div id="save-status" className="sr-only">
+                You have unsaved changes that will be lost if you navigate away
+              </div>
+            )}
           </div>
         </form>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +26,19 @@ export default function ProfileEditor({
     onDelete,
     onBack
   )
+
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(onMount, [])
+
+  // Focus management - focus the first input when component mounts
+  useEffect(() => {
+    if (nameInputRef.current) {
+      setTimeout(() => {
+        nameInputRef.current?.focus()
+      }, 100)
+    }
+  }, [])
 
   return (
     <div className="profile-editor">
@@ -48,19 +60,27 @@ export default function ProfileEditor({
           actions.saveProfile()
         }}
         noValidate
+        aria-label={`${
+          state.isNewProfile ? 'Create new' : 'Edit'
+        } profile form`}
       >
         <div className="form-group">
           <label htmlFor="profile-name">Name *</label>
           <Input
+            ref={nameInputRef}
             id="profile-name"
             value={state.formData.name || ''}
             onChange={(e) => actions.updateName(e.target.value)}
             className={state.errors.name ? 'error' : ''}
-            aria-describedby={state.errors.name ? 'name-error' : undefined}
+            aria-describedby={state.errors.name ? 'name-error' : 'name-help'}
             aria-invalid={!!state.errors.name}
             required
-            autoFocus
           />
+          {!state.errors.name && (
+            <div id="name-help" className="sr-only">
+              Enter a descriptive name for this profile
+            </div>
+          )}
           {state.errors.name && (
             <span
               id="name-error"
@@ -81,9 +101,9 @@ export default function ProfileEditor({
             onChange={(e) => actions.updateDescription(e.target.value)}
             aria-describedby="description-help"
           />
-          <span id="description-help" className="sr-only">
+          <div id="description-help" className="sr-only">
             Optional brief description of this profile's purpose
-          </span>
+          </div>
         </div>
 
         <div className="form-group">
@@ -101,9 +121,10 @@ export default function ProfileEditor({
             required
           />
           {!state.errors.prompt && (
-            <span id="prompt-help" className="sr-only">
-              The main prompt that will be used for AI processing
-            </span>
+            <div id="prompt-help" className="sr-only">
+              The main prompt that will be used for AI processing. This is the
+              core instruction that guides how the AI will process your input.
+            </div>
           )}
           {state.errors.prompt && (
             <span
@@ -126,9 +147,10 @@ export default function ProfileEditor({
             rows={3}
             aria-describedby="example-input-help"
           />
-          <span id="example-input-help" className="sr-only">
-            Optional example of input text for this profile
-          </span>
+          <div id="example-input-help" className="sr-only">
+            Optional example of input text for this profile. This helps
+            demonstrate what kind of input this profile is designed to handle.
+          </div>
         </div>
 
         <div className="form-group">
@@ -147,9 +169,10 @@ export default function ProfileEditor({
             aria-invalid={!!state.errors.example_output}
           />
           {!state.errors.example_output && (
-            <span id="example-output-help" className="sr-only">
-              Optional example of expected output for this profile
-            </span>
+            <div id="example-output-help" className="sr-only">
+              Optional example of expected output for this profile. This shows
+              what the AI should produce when processing the example input.
+            </div>
           )}
           {state.errors.example_output && (
             <span
@@ -173,22 +196,24 @@ export default function ProfileEditor({
             aria-describedby="shortcut-help"
             placeholder="e.g., Ctrl+Shift+P"
           />
-          <span id="shortcut-help" className="sr-only">
-            Optional keyboard shortcut to activate this profile
-          </span>
+          <div id="shortcut-help" className="sr-only">
+            Optional keyboard shortcut to activate this profile. Use standard
+            modifier keys like Ctrl, Alt, Shift with other keys.
+          </div>
         </div>
 
         <div className="form-group toggle-group">
-          <label htmlFor="profile-visible">Visible</label>
+          <label htmlFor="profile-visible">Visible in quick access</label>
           <Switch
             id="profile-visible"
             checked={state.formData.visible || false}
             onCheckedChange={actions.updateVisible}
             aria-describedby="visible-help"
           />
-          <span id="visible-help" className="sr-only">
-            Whether this profile appears in the quick access list
-          </span>
+          <div id="visible-help" className="sr-only">
+            When enabled, this profile appears in the quick access list. Maximum
+            of 5 profiles can be visible at once.
+          </div>
         </div>
 
         <div className="editor-actions">
@@ -200,7 +225,7 @@ export default function ProfileEditor({
               state.isNewProfile ? 'Create' : 'Save changes to'
             } profile ${state.formData.name || 'unnamed'}`}
           >
-            {state.isNewProfile ? 'Create' : 'Save'}
+            {state.isNewProfile ? 'Create Profile' : 'Save Changes'}
           </Button>
           {profile.id && !state.isNewProfile && (
             <Button
@@ -208,9 +233,15 @@ export default function ProfileEditor({
               className="delete-button"
               onClick={actions.deleteProfile}
               aria-label={`Delete profile ${state.formData.name || 'unnamed'}`}
+              aria-describedby="delete-warning"
             >
-              Delete
+              Delete Profile
             </Button>
+          )}
+          {profile.id && !state.isNewProfile && (
+            <div id="delete-warning" className="sr-only">
+              Warning: Deleting this profile is permanent and cannot be undone.
+            </div>
           )}
         </div>
       </form>
