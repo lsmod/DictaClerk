@@ -1,5 +1,5 @@
 ---
-description: Enforce MVVM for React page components; views are logic-free, use a single ViewModel hook
+description: Enforce MVVM for React Window or Page components; views are logic-free, use a single ViewModel hook
 globs: *.tsx
 alwaysApply: false
 ---
@@ -14,12 +14,12 @@ alwaysApply: false
 
 ## Valid example
 ```tsx
-// src/pages/LoginPage.tsx
+// src/pages/LoginWindow.tsx
 import { useEffect } from "react";
-import { useLoginPageViewModel } from "./loginPage.viewModel";
+import { useLoginWindowViewModel } from "./loginWindow.viewModel";
 
-export default function LoginPage() {
-  const { state, actions, onMount } = useLoginPageViewModel();
+export default function LoginWindow() {
+  const { state, actions, onMount } = useLoginWindowViewModel();
   useEffect(onMount, []);          // only allowed side-effect
   return (
     <form onSubmit={actions.submitLogin}>
