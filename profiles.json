@@ -1,17 +1,30 @@
 {
   "profiles": [
     {
+      "id": "1",
+      "name": "Clipboard",
+      "description": "Copy transcription directly to clipboard without formatting",
+      "prompt": null,
+      "example_input": null,
+      "example_output": null,
+      "active": false,
+      "visible": true,
+      "shortcut": null,
+      "created_at": "2025-01-01T14:20:29Z",
+      "updated_at": "2025-01-01T14:20:29Z"
+    },
+    {
       "id": "test-profile",
-      "name": "Test Profile",
-      "description": "Test profile for durability tests",
-      "prompt": "met tout en majuscule",
-      "example_input": "lol",
-      "example_output": "LOL",
+      "name": "MAJ",
+      "description": "uppercase",
+      "prompt": "met tout en majusucle",
+      "example_input": "",
+      "example_output": "",
       "active": true,
       "visible": true,
       "shortcut": "Ctrl+Alt+T",
       "created_at": "2025-01-01T00:00:00Z",
-      "updated_at": "2025-06-09T13:56:21.877Z"
+      "updated_at": "2025-06-09T14:21:01.864Z"
     }
   ],
   "default_profile_id": "test-profile"

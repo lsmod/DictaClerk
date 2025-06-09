@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use tauri::{Emitter, State};
 
-use crate::services::profile_engine::{ProfileCollection, ProfileEngine};
+use crate::services::profile_engine::{ensure_clipboard_profile, ProfileCollection, ProfileEngine};
 
 /// State to hold the active profile ID
 #[derive(Default)]
@@ -52,9 +52,14 @@ pub async fn load_profiles() -> Result<ProfileCollection, String> {
     let profiles_content = profiles_json
         .ok_or_else(|| format!("Could not find profiles.json. Last error: {}", last_error))?;
 
-    engine
+    let mut profile_collection = engine
         .load_profiles_from_json(&profiles_content)
-        .map_err(|e| format!("Failed to parse profiles: {}", e))
+        .map_err(|e| format!("Failed to parse profiles: {}", e))?;
+
+    // Ensure clipboard profile always exists as Profile 1
+    ensure_clipboard_profile(&mut profile_collection.profiles);
+
+    Ok(profile_collection)
 }
 
 /// Select a profile and set it as active
@@ -134,13 +139,21 @@ pub async fn apply_profile_to_text(profile_id: String, text: String) -> Result<S
     let profiles_content = profiles_json
         .ok_or_else(|| format!("Could not find profiles.json. Last error: {}", last_error))?;
 
-    let profile_collection = engine
+    let mut profile_collection = engine
         .load_profiles_from_json(&profiles_content)
         .map_err(|e| format!("Failed to parse profiles: {}", e))?;
+
+    // Ensure clipboard profile always exists as Profile 1
+    ensure_clipboard_profile(&mut profile_collection.profiles);
 
     let profile = engine
         .find_profile_by_id(&profile_collection, &profile_id)
         .map_err(|e| format!("Profile not found: {}", e))?;
+
+    // Handle clipboard profile - return text directly without GPT formatting
+    if profile.is_clipboard_profile() {
+        return Ok(text);
+    }
 
     engine
         .apply_profile(profile, &text)

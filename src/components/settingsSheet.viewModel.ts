@@ -531,6 +531,12 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       }
     },
     deleteProfile: async (profileId: string) => {
+      // Prevent deletion of clipboard profile
+      if (profileId === '1') {
+        setSaveError('Cannot delete the clipboard profile')
+        return
+      }
+
       try {
         const updatedProfiles = profiles.filter((p) => p.id !== profileId)
 
@@ -557,25 +563,35 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       }
     },
     toggleProfileVisibility: async (profileId: string, visible: boolean) => {
-      const visibleCount = profiles.filter((p) => p.visible).length
+      // Prevent hiding clipboard profile
+      if (profileId === '1' && !visible) {
+        setSaveError('Clipboard profile must always be visible')
+        return
+      }
+
+      // Count visible profiles excluding clipboard profile for the 4-profile limit
+      const visibleUserProfiles = profiles.filter(
+        (p) => p.visible && p.id !== '1'
+      )
+      const visibleCount = visibleUserProfiles.length
 
       try {
         let updatedProfiles = [...profiles]
 
-        if (visible && visibleCount >= 5) {
-          // If trying to make visible but already at limit, hide the oldest visible profile first
-          const visibleProfiles = profiles.filter(
-            (p) => p.visible && p.id !== profileId
-          )
-          if (visibleProfiles.length > 0) {
-            // Find the profile that was updated longest ago (oldest)
-            const oldestVisible = visibleProfiles.reduce((oldest, current) => {
-              return new Date(current.updated_at) < new Date(oldest.updated_at)
-                ? current
-                : oldest
-            })
+        if (visible && visibleCount >= 4 && profileId !== '1') {
+          // If trying to make visible but already at 4 user profiles limit, hide the oldest visible user profile first
+          if (visibleUserProfiles.length > 0) {
+            // Find the user profile that was updated longest ago (oldest)
+            const oldestVisible = visibleUserProfiles.reduce(
+              (oldest, current) => {
+                return new Date(current.updated_at) <
+                  new Date(oldest.updated_at)
+                  ? current
+                  : oldest
+              }
+            )
 
-            // Hide the oldest visible profile
+            // Hide the oldest visible user profile
             updatedProfiles = updatedProfiles.map((p) =>
               p.id === oldestVisible.id
                 ? { ...p, visible: false, updated_at: new Date().toISOString() }
@@ -609,28 +625,45 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       }
     },
     reorderProfiles: async (activeId: string, overId: string) => {
+      // Prevent reordering clipboard profile
+      if (activeId === '1' || overId === '1') {
+        setSaveError('Cannot reorder the clipboard profile')
+        return
+      }
+
       try {
-        // Find the indices of the profiles being reordered
-        const activeIndex = profiles.findIndex((p) => p.id === activeId)
-        const overIndex = profiles.findIndex((p) => p.id === overId)
+        // Only reorder non-clipboard profiles
+        const userProfiles = profiles.filter((p) => p.id !== '1')
+        const clipboardProfile = profiles.find((p) => p.id === '1')
+
+        // Find the indices of the profiles being reordered within user profiles
+        const activeIndex = userProfiles.findIndex((p) => p.id === activeId)
+        const overIndex = userProfiles.findIndex((p) => p.id === overId)
 
         if (activeIndex === -1 || overIndex === -1) return
 
-        // Create a new array with the reordered profiles
-        const reorderedProfiles = [...profiles]
-        const [movedProfile] = reorderedProfiles.splice(activeIndex, 1)
-        reorderedProfiles.splice(overIndex, 0, movedProfile)
+        // Create a new array with the reordered user profiles
+        const reorderedUserProfiles = [...userProfiles]
+        const [movedProfile] = reorderedUserProfiles.splice(activeIndex, 1)
+        reorderedUserProfiles.splice(overIndex, 0, movedProfile)
+
+        // Combine clipboard profile with reordered user profiles
+        const updatedProfiles = clipboardProfile
+          ? [clipboardProfile, ...reorderedUserProfiles]
+          : reorderedUserProfiles
 
         // Update timestamps for the moved profiles
-        const updatedProfiles = reorderedProfiles.map((profile) => ({
+        const profilesWithTimestamp = updatedProfiles.map((profile) => ({
           ...profile,
           updated_at: new Date().toISOString(),
         }))
 
         const profileCollection = {
-          profiles: updatedProfiles,
+          profiles: profilesWithTimestamp,
           default_profile_id:
-            profiles.find((p) => p.active)?.id || updatedProfiles[0]?.id || '',
+            profiles.find((p) => p.active)?.id ||
+            profilesWithTimestamp[0]?.id ||
+            '',
         }
 
         await invoke('save_profiles', { profiles: profileCollection })

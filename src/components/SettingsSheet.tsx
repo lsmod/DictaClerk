@@ -8,6 +8,8 @@ import {
   EyeOff,
   AlertCircle,
   Loader2,
+  Clipboard,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -474,66 +476,90 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
           </div>
 
           <div className="profiles-section">
-            <div className="profiles-header">
-              <label id="profiles-label">
-                Profiles ({state.visibleProfilesCount}/5 visible)
-              </label>
-              {state.visibleProfilesCount >= 5 && (
-                <div
-                  id="visibility-limit-notice"
-                  className="visibility-limit-warning"
-                >
-                  ℹ️ Showing 5 profiles (maximum). Making another profile
-                  visible will auto-hide the oldest one.
+            {/* Clipboard Profile - Read-only display */}
+            <div className="clipboard-profile-section">
+              <h3>Default Profile</h3>
+              <div className="profile-row clipboard-profile-row">
+                <div className="profile-info">
+                  <Clipboard size={16} />
+                  <span>Clipboard (Direct Copy)</span>
+                  <span className="profile-description">
+                    Copies transcription directly without GPT-4 formatting
+                  </span>
                 </div>
+                <div className="profile-status">
+                  <Check size={14} className="text-green-400" />
+                  <span>Always Available</span>
+                </div>
+              </div>
+            </div>
+
+            {/* User-configurable profiles (2-5) */}
+            <div className="user-profiles-section">
+              <div className="section-header">
+                <h3>Custom Profiles</h3>
+                <span className="profile-count">
+                  {state.profiles.filter((p) => p.id !== '1').length}/4
+                </span>
+              </div>
+
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={state.profiles
+                    .filter((p) => p.id !== '1')
+                    .map((p) => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div
+                    className="profiles-list"
+                    role="list"
+                    aria-labelledby="profiles-label"
+                    data-dragging={isDragActive}
+                  >
+                    {state.profiles
+                      .filter((p) => p.id !== '1')
+                      .map((profile) => (
+                        <SortableProfileRow
+                          key={profile.id}
+                          profile={profile}
+                          visibleProfilesCount={state.visibleProfilesCount}
+                          onToggleVisibility={actions.toggleProfileVisibility}
+                          onEdit={actions.navigateToEditor}
+                          onKeyboardReorder={handleKeyboardReorder}
+                          isDragActive={isDragActive}
+                          allProfiles={state.profiles.filter(
+                            (p) => p.id !== '1'
+                          )}
+                        />
+                      ))}
+                    {state.profiles.filter((p) => p.id !== '1').length ===
+                      0 && (
+                      <div className="empty-profiles-message" role="status">
+                        No custom profiles yet. Create your first profile below.
+                      </div>
+                    )}
+                  </div>
+                </SortableContext>
+              </DndContext>
+
+              {state.profiles.filter((p) => p.id !== '1').length < 4 && (
+                <Button
+                  type="button"
+                  className="add-profile-button"
+                  onClick={actions.navigateToAddProfile}
+                  aria-label="Add new profile"
+                >
+                  <Plus size={16} />
+                  Add Profile (
+                  {state.profiles.filter((p) => p.id !== '1').length}/4)
+                </Button>
               )}
             </div>
-            <DndContext
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={state.profiles.map((p) => p.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div
-                  className="profiles-list"
-                  role="list"
-                  aria-labelledby="profiles-label"
-                  data-dragging={isDragActive}
-                >
-                  {state.profiles.map((profile) => (
-                    <SortableProfileRow
-                      key={profile.id}
-                      profile={profile}
-                      visibleProfilesCount={state.visibleProfilesCount}
-                      onToggleVisibility={actions.toggleProfileVisibility}
-                      onEdit={actions.navigateToEditor}
-                      onKeyboardReorder={handleKeyboardReorder}
-                      isDragActive={isDragActive}
-                      allProfiles={state.profiles}
-                    />
-                  ))}
-                  {state.profiles.length === 0 && (
-                    <div className="empty-profiles-message" role="status">
-                      No profiles yet. Create your first profile below.
-                    </div>
-                  )}
-                </div>
-              </SortableContext>
-            </DndContext>
           </div>
-
-          <Button
-            type="button"
-            className="add-profile-button"
-            onClick={actions.navigateToAddProfile}
-            aria-label="Add new profile"
-          >
-            <Plus size={16} />
-            Add Profile
-          </Button>
 
           {/* Save Settings Button */}
           <div className="settings-actions">

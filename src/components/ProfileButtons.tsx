@@ -4,11 +4,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useProfiles } from '@/contexts/ProfileContext'
+import { Clipboard } from 'lucide-react'
+import { useProfiles, Profile } from '@/contexts/ProfileContext'
 
 const ProfileButtons: React.FC = () => {
-  const { visibleProfiles, activeProfileId, selectProfile, isLoading, error } =
-    useProfiles()
+  const {
+    visibleProfiles,
+    activeProfileId,
+    selectProfile,
+    isLoading,
+    error,
+    isClipboardProfile,
+  } = useProfiles()
 
   const announceProfileChange = (profileName: string) => {
     const liveRegion = document.getElementById('main-live-region')
@@ -99,6 +106,17 @@ const ProfileButtons: React.FC = () => {
     return profileName.substring(0, 1).toUpperCase()
   }
 
+  const ProfileButtonContent = ({ profile }: { profile: Profile }) => {
+    if (isClipboardProfile(profile.id)) {
+      return <Clipboard size={16} className="clipboard-icon" />
+    }
+    return (
+      <span className="profile-text">
+        {getProfileDisplayName(profile.name)}
+      </span>
+    )
+  }
+
   return (
     <div
       className="profile-buttons"
@@ -111,24 +129,35 @@ const ProfileButtons: React.FC = () => {
             <button
               className={`profile-button ${
                 activeProfileId === profile.id ? 'active' : ''
-              }`}
+              } ${isClipboardProfile(profile.id) ? 'clipboard-profile' : ''}`}
               onClick={() => handleProfileClick(profile.id)}
               onKeyDown={(e) => handleKeyDown(e, profile.id)}
               role="radio"
               aria-checked={activeProfileId === profile.id}
-              aria-label={`Profile ${index + 1}: ${profile.name}${
-                profile.shortcut ? `, shortcut ${profile.shortcut}` : ''
-              }`}
+              aria-label={`Profile ${index + 1}: ${
+                isClipboardProfile(profile.id)
+                  ? 'Clipboard - Direct copy'
+                  : profile.name
+              }${profile.shortcut ? `, shortcut ${profile.shortcut}` : ''}`}
               aria-describedby={`profile-${profile.id}-tooltip`}
-              title={`${profile.name}${
-                profile.shortcut ? ` (${profile.shortcut})` : ''
-              }`}
+              title={`${
+                isClipboardProfile(profile.id)
+                  ? 'Clipboard - Direct copy'
+                  : profile.name
+              }${profile.shortcut ? ` (${profile.shortcut})` : ''}`}
             >
-              {getProfileDisplayName(profile.name)}
+              <ProfileButtonContent profile={profile} />
+              {profile.shortcut && (
+                <span className="profile-shortcut">{profile.shortcut}</span>
+              )}
             </button>
           </TooltipTrigger>
           <TooltipContent id={`profile-${profile.id}-tooltip`}>
-            <p>{profile.name}</p>
+            <p>
+              {isClipboardProfile(profile.id)
+                ? 'Clipboard - Direct copy'
+                : profile.name}
+            </p>
             {profile.description && (
               <p className="text-xs opacity-75">{profile.description}</p>
             )}

@@ -345,6 +345,64 @@ impl Default for ProfileEngine {
     }
 }
 
+impl Profile {
+    /// Check if this profile is the clipboard profile (direct copy without formatting)
+    pub fn is_clipboard_profile(&self) -> bool {
+        self.id == "1"
+    }
+
+    /// Check if this profile should use GPT formatting
+    pub fn should_use_gpt_formatting(&self) -> bool {
+        !self.is_clipboard_profile()
+            && self.prompt.is_some()
+            && !self.prompt.as_ref().unwrap().is_empty()
+    }
+}
+
+/// Ensure clipboard profile (Profile 1) always exists in the system
+pub fn ensure_clipboard_profile(profiles: &mut Vec<Profile>) {
+    if !profiles.iter().any(|p| p.id == "1") {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let timestamp = format!(
+            "2025-01-01T{:02}:{:02}:{:02}Z",
+            (now / 3600) % 24,
+            (now / 60) % 60,
+            now % 60
+        );
+
+        let clipboard_profile = Profile {
+            id: "1".to_string(),
+            name: "Clipboard".to_string(),
+            description: Some(
+                "Copy transcription directly to clipboard without formatting".to_string(),
+            ),
+            prompt: None, // No prompt for clipboard profile - bypasses GPT formatting
+            example_input: None,
+            example_output: None,
+            active: false,       // Not active by default, but always available
+            visible: Some(true), // Always visible as first profile
+            shortcut: None,
+            created_at: timestamp.clone(),
+            updated_at: timestamp,
+        };
+
+        // Insert at the beginning to ensure it's Profile 1
+        profiles.insert(0, clipboard_profile);
+    } else {
+        // Ensure the existing Profile 1 has correct clipboard profile properties
+        if let Some(profile_1) = profiles.iter_mut().find(|p| p.id == "1") {
+            profile_1.name = "Clipboard".to_string();
+            profile_1.description =
+                Some("Copy transcription directly to clipboard without formatting".to_string());
+            profile_1.prompt = None; // Ensure no prompt for clipboard profile
+            profile_1.visible = Some(true); // Always visible
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

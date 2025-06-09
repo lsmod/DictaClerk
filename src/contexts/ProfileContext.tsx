@@ -25,11 +25,14 @@ interface ProfileContextType {
   profiles: Profile[]
   activeProfileId: string | null
   visibleProfiles: Profile[]
+  editableProfiles: Profile[]
   isLoading: boolean
   error: string | null
   selectProfile: (profileId: string) => Promise<void>
   loadProfiles: () => Promise<void>
   setActiveProfile: (profileId: string) => void
+  isClipboardProfile: (profileId: string) => boolean
+  getVisibleProfiles: () => Profile[]
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined)
@@ -54,9 +57,24 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const visibleProfiles = profiles
-    .filter((profile) => profile.visible === true)
-    .slice(0, 5) // Limit to 5 visible profiles
+  // Get visible profiles with clipboard profile first, then up to 4 user profiles
+  const getVisibleProfiles = () => {
+    const clipboardProfile = profiles.find((p) => p.id === '1')
+    const userProfiles = profiles
+      .filter((p) => p.id !== '1' && p.visible === true)
+      .slice(0, 4)
+
+    return clipboardProfile ? [clipboardProfile, ...userProfiles] : userProfiles
+  }
+
+  const visibleProfiles = getVisibleProfiles()
+
+  // Get editable profiles (excluding clipboard profile, max 4)
+  const editableProfiles = profiles.filter((p) => p.id !== '1').slice(0, 4)
+
+  const isClipboardProfile = (profileId: string) => {
+    return profileId === '1'
+  }
 
   const loadProfiles = async () => {
     try {
@@ -140,11 +158,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({
     profiles,
     activeProfileId,
     visibleProfiles,
+    editableProfiles,
     isLoading,
     error,
     selectProfile,
     loadProfiles,
     setActiveProfile,
+    isClipboardProfile,
+    getVisibleProfiles,
   }
 
   return (
