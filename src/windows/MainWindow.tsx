@@ -8,6 +8,7 @@ import ElapsedTime from '../components/ElapsedTime'
 import VolumeVisualizer from '../components/VolumeVisualizer'
 import SettingsButton from '../components/SettingsButton'
 import { useMainWindowViewModel } from './mainWindow.viewModel'
+import { Toaster } from '@/components/ui/sonner'
 
 export default function MainWindow() {
   const { onMount } = useMainWindowViewModel()
@@ -88,6 +89,9 @@ export default function MainWindow() {
               <ProfileButtons />
             </section>
           </main>
+
+          {/* Toast notifications */}
+          <Toaster />
         </TooltipProvider>
       </RecordingProvider>
     </ProfileProvider>

@@ -78,6 +78,31 @@ export function useMainWindowViewModel() {
         console.error('Failed to initialize shortcut manager:', error)
       }
 
+      // Initialize Whisper client if API key is available
+      try {
+        const settings = await invoke('load_settings')
+        console.log('Loaded settings for Whisper initialization')
+
+        if (settings && typeof settings === 'object' && 'whisper' in settings) {
+          const whisperSettings = settings.whisper as { api_key?: string }
+          if (
+            whisperSettings.api_key &&
+            whisperSettings.api_key.trim() !== ''
+          ) {
+            await invoke('init_whisper_client', {
+              apiKey: whisperSettings.api_key,
+            })
+            console.log('Whisper client initialized successfully')
+          } else {
+            console.log(
+              'No API key found in settings, Whisper client not initialized'
+            )
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize Whisper client:', error)
+      }
+
       if (isFirstLaunch) {
         localStorage.setItem('dicta-clerk-first-launch', 'false')
       }

@@ -1,0 +1,23 @@
+{
+  "whisper": {
+    "api_key": "your-openai-api-key-here",
+    "endpoint": "https://api.openai.com/v1/audio/transcriptions",
+    "model": "whisper-1",
+    "timeout_seconds": 30,
+    "max_retries": 3
+  },
+  "audio": {
+    "input_device": null,
+    "sample_rate": 44100,
+    "buffer_size": 1024
+  },
+  "encoding": {
+    "bitrate": 32000,
+    "size_limit_mb": 23
+  },
+  "ui": {
+    "theme": "auto",
+    "auto_start_recording": false
+  },
+  "global_shortcut": "CmdOrCtrl+Shift+F9"
+}

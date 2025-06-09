@@ -38,3 +38,6 @@ src-tauri/target/
 # Personal environment files
 .env.local
 .env.personal
+
+# Settings files with sensitive information
+settings.json

@@ -12,13 +12,13 @@ use commands::{
     is_whisper_initialized, is_window_hidden, load_profiles, load_settings, open_settings_window,
     register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
     save_profiles, save_settings, select_profile, show_main_window,
-    show_window_and_start_recording, start_capture, stop_capture, subscribe_rms,
-    toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
-    transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
-    unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
-    update_tray_status, v1_save_profiles, v1_save_settings, validate_shortcut_conflict,
-    AudioCaptureState, ClipboardServiceState, ProfileAppState, ShortcutMgrState, SystemTrayState,
-    WhisperClientState,
+    show_window_and_start_recording, start_capture, stop_capture,
+    stop_recording_and_process_to_clipboard, subscribe_rms, toggle_main_window, toggle_record,
+    toggle_record_with_tray, transcribe_audio, transcribe_recorded_audio,
+    unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
+    update_global_shortcut, update_tray_global_shortcut, update_tray_status, v1_save_profiles,
+    v1_save_settings, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
+    ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -55,6 +55,7 @@ pub fn run() {
             init_audio_capture,
             start_capture,
             stop_capture,
+            stop_recording_and_process_to_clipboard,
             is_recording,
             subscribe_rms,
             encode_wav_to_ogg,

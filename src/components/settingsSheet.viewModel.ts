@@ -363,61 +363,53 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     },
     saveSettings: async (e?: React.MouseEvent) => {
       // Prevent any default button behavior
-      if (e) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
+      e?.preventDefault()
+      e?.stopPropagation()
 
-      if (!settings) return
-
-      // Check if shortcut validation failed
-      if (!shortcutValidation.isValid && settings.global_shortcut) {
-        setSaveError(shortcutValidation.error || 'Invalid shortcut')
+      if (isSavingRef.current || !settings) {
         return
       }
 
+      isSavingRef.current = true
+      setIsSaving(true)
+      setSaveError(null)
+      setSaveSuccess(false)
+
       try {
-        isSavingRef.current = true
-        setIsSaving(true)
-        setSaveError(null)
-        setSaveSuccess(false)
+        console.log('Saving settings...', settings)
 
-        console.log('Saving settings:', settings)
+        // Save settings first
+        await invoke('save_settings', { settings })
+        console.log('Settings saved successfully')
 
-        // Check if global shortcut changed
-        const shortcutChanged =
-          originalSettings &&
-          settings.global_shortcut !== originalSettings.global_shortcut
-
-        // Save settings to backend
-        const result = await invoke<string>('save_settings', { settings })
-        console.log('Save result:', result)
-
-        // If global shortcut changed, update it immediately
-        if (shortcutChanged) {
+        // Reinitialize Whisper client if API key is provided
+        if (
+          settings.whisper.api_key &&
+          settings.whisper.api_key.trim() !== ''
+        ) {
           try {
-            console.log(
-              'Updating global shortcut to:',
-              settings.global_shortcut
-            )
-            await invoke<string>('update_global_shortcut', {
-              newShortcut: settings.global_shortcut,
+            await invoke('init_whisper_client', {
+              apiKey: settings.whisper.api_key,
             })
-            console.log('Global shortcut updated successfully')
-          } catch (shortcutError) {
-            console.error('Failed to update global shortcut:', shortcutError)
-            setSaveError(
-              shortcutError instanceof Error
-                ? `Settings saved but failed to update global shortcut: ${shortcutError.message}`
-                : 'Settings saved but failed to update global shortcut'
+            console.log('Whisper client reinitialized with new API key')
+          } catch (whisperError) {
+            console.error(
+              'Failed to reinitialize Whisper client:',
+              whisperError
             )
+            // Don't fail the save operation for this, just log it
           }
         }
 
-        // Update original settings to current settings (reset dirty state)
-        setOriginalSettings(JSON.parse(JSON.stringify(settings)))
+        // Save profiles
+        await invoke('save_profiles', { profiles })
+        console.log('Profiles saved successfully')
 
+        // Update original settings to reflect the saved state
+        setOriginalSettings(JSON.parse(JSON.stringify(settings))) // Deep copy
+        setHasUnsavedChanges(false)
         setSaveSuccess(true)
+
         setTimeout(() => setSaveSuccess(false), 3000) // Clear success message after 3 seconds
       } catch (error) {
         console.error('Failed to save settings:', error)
@@ -439,21 +431,26 @@ export function useSettingsSheetViewModel(onClose: () => void) {
         setIsTestingApiKey(true)
         setSaveError(null)
 
-        // Test API key by making a simple request
-        // TODO: Implement actual API key testing via IPC command
         console.log(
           'Testing API key:',
           settings.whisper.api_key.substring(0, 10) + '...'
         )
 
-        // For now, just simulate a test
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Test API key by initializing the Whisper client
+        await invoke('init_whisper_client', {
+          apiKey: settings.whisper.api_key,
+        })
+        console.log('API key test successful - Whisper client initialized')
 
         setSaveSuccess(true)
         setTimeout(() => setSaveSuccess(false), 3000)
       } catch (error) {
         console.error('API key test failed:', error)
-        setSaveError('API key test failed')
+        setSaveError(
+          error instanceof Error
+            ? `API key test failed: ${error.message}`
+            : 'API key test failed'
+        )
       } finally {
         setIsTestingApiKey(false)
       }

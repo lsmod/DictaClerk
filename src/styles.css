@@ -436,6 +436,24 @@
   transform: scale(0.95);
 }
 
+/* Processing state - Processing button */
+.record-stop-toggle.processing {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  border-color: #ffaa00;
+  animation: pulse-processing 1.5s infinite;
+  cursor: wait;
+}
+
+.record-stop-toggle.processing:hover {
+  background: linear-gradient(145deg, #333, #222);
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+  transform: scale(1.02);
+}
+
+.record-stop-toggle.processing:disabled {
+  pointer-events: none;
+}
+
 /* Icons */
 .toggle-icon {
   width: 20px;
@@ -456,6 +474,16 @@
   box-shadow: 0 0 8px rgba(255, 0, 51, 0.5);
 }
 
+/* Processing icon (spinning circle with gap) */
+.processing-icon {
+  border: 3px solid #ffaa00;
+  border-top: 3px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  animation: spin 1s linear infinite;
+  box-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
+}
+
 /* Pulse animation for recording state */
 @keyframes pulse-recording {
   0%,
@@ -468,6 +496,31 @@
     box-shadow:
       0 4px 8px rgba(0, 0, 0, 0.3),
       0 0 0 8px rgba(255, 0, 51, 0);
+  }
+}
+
+/* Pulse animation for processing state */
+@keyframes pulse-processing {
+  0%,
+  100% {
+    box-shadow:
+      0 4px 8px rgba(0, 0, 0, 0.3),
+      0 0 0 0 rgba(255, 170, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 4px 8px rgba(0, 0, 0, 0.3),
+      0 0 0 8px rgba(255, 170, 0, 0);
+  }
+}
+
+/* Spinning animation for processing icon */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 
