@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 use hound::WavReader;
-use ogg::{writing::PacketWriteEndInfo, writing::PacketWriter};
-use opus::{Application, Channels, Encoder as OpusEncoder};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
+use std::num::NonZero;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio::sync::mpsc;
+use vorbis_rs::{VorbisBitrateManagementStrategy, VorbisEncoderBuilder};
 
 /// Information about the encoded OGG file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,8 +42,8 @@ pub enum EncodingError {
     #[error("Failed to read WAV file: {0}")]
     WavReadError(#[from] hound::Error),
 
-    #[error("Failed to create Opus encoder: {0}")]
-    OpusError(#[from] opus::Error),
+    #[error("Failed to create Vorbis encoder: {0}")]
+    VorbisError(#[from] vorbis_rs::VorbisError),
 
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
@@ -55,10 +55,10 @@ pub enum EncodingError {
     FileSizeExceedsLimit { estimated: u64 },
 }
 
-/// The Encoder trait for converting WAV to OGG/Opus
+/// The Encoder trait for converting WAV to OGG/Vorbis
 #[async_trait]
 pub trait Encoder: Send + Sync {
-    /// Encode a WAV file to OGG/Opus format
+    /// Encode a WAV file to OGG/Vorbis format
     ///
     /// # Arguments
     /// * `wav_path` - Path to the input WAV file
@@ -75,22 +75,22 @@ pub trait Encoder: Send + Sync {
     ) -> Result<OggInfo, EncodingError>;
 }
 
-/// Default implementation of the Encoder trait
-pub struct OggOpusEncoder {
+/// Default implementation of the Encoder trait using OGG/Vorbis
+pub struct OggVorbisEncoder {
     /// Target bitrate in bits per second (default: 32000)
     bitrate: i32,
     /// Size limit in bytes before warning (~23MB)
     size_limit: u64,
 }
 
-impl Default for OggOpusEncoder {
+impl Default for OggVorbisEncoder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl OggOpusEncoder {
-    /// Create a new OggOpusEncoder with default settings
+impl OggVorbisEncoder {
+    /// Create a new OggVorbisEncoder with default settings
     pub fn new() -> Self {
         Self {
             bitrate: 32000,               // 32 kbps as specified in requirements
@@ -98,7 +98,7 @@ impl OggOpusEncoder {
         }
     }
 
-    /// Create a new OggOpusEncoder with custom settings
+    /// Create a new OggVorbisEncoder with custom settings
     pub fn with_bitrate(bitrate: i32) -> Self {
         Self {
             bitrate,
@@ -122,28 +122,10 @@ impl OggOpusEncoder {
         let overhead = bytes_audio / 20;
         bytes_audio + overhead
     }
-
-    /// Calculate running average of frame sizes for more accurate forecasting
-    fn update_size_forecast(
-        &self,
-        frames_encoded: usize,
-        bytes_written: u64,
-        total_frames: usize,
-    ) -> u64 {
-        if frames_encoded == 0 {
-            return 0;
-        }
-
-        let avg_frame_size = bytes_written as f64 / frames_encoded as f64;
-        let estimated_total = avg_frame_size * total_frames as f64;
-
-        // Add 2% buffer for accuracy as per requirements
-        (estimated_total * 1.02) as u64
-    }
 }
 
 #[async_trait]
-impl Encoder for OggOpusEncoder {
+impl Encoder for OggVorbisEncoder {
     async fn encode(
         &self,
         wav_path: &Path,
@@ -173,24 +155,20 @@ impl Encoder for OggOpusEncoder {
         let duration_seconds = total_samples as f64 / wav_spec.sample_rate as f64;
         let _initial_estimate = self.estimate_file_size(duration_seconds);
 
-        // Create Opus encoder with VoIP application and 32kbps bitrate
-        let mut opus_encoder =
-            OpusEncoder::new(wav_spec.sample_rate, Channels::Mono, Application::Voip)?;
-
-        opus_encoder.set_bitrate(opus::Bitrate::Bits(self.bitrate))?;
-
         // Create OGG output file
         let output_file = File::create(&output_path)?;
         let output_writer = BufWriter::new(output_file);
 
-        // Initialize OGG stream
-        let mut packet_writer = PacketWriter::new(output_writer);
-        let stream_serial = 1; // Simple serial number for the stream
-
-        // Opus frame size (20ms at the sample rate)
-        let frame_size = (wav_spec.sample_rate as usize * 20) / 1000; // 20ms frames
-        let mut input_buffer = vec![0f32; frame_size];
-        let mut output_buffer = vec![0u8; 4000]; // Opus max packet size
+        // Create Vorbis encoder with target bitrate
+        let mut encoder = VorbisEncoderBuilder::new(
+            NonZero::new(wav_spec.sample_rate).unwrap(),
+            NonZero::new(1u8).unwrap(), // mono (1 channel)
+            output_writer,
+        )?
+        .bitrate_management_strategy(VorbisBitrateManagementStrategy::Vbr {
+            target_bitrate: NonZero::new(self.bitrate as u32).unwrap(),
+        })
+        .build()?;
 
         // Read all samples into memory for processing
         let samples: Result<Vec<f32>, _> = wav_reader
@@ -199,80 +177,53 @@ impl Encoder for OggOpusEncoder {
             .collect();
         let samples = samples?;
 
-        let total_frames = samples.len().div_ceil(frame_size);
-        let mut frames_encoded = 0;
-        let mut bytes_written = 0u64;
+        // Process samples in chunks for better memory management and progress reporting
+        let chunk_size = wav_spec.sample_rate as usize / 10; // 100ms chunks
+        let total_chunks = samples.len().div_ceil(chunk_size);
+        let mut chunks_processed = 0;
         let mut size_warning_sent = false;
 
-        // Process audio in frames
-        for (chunk_idx, chunk) in samples.chunks(frame_size).enumerate() {
-            // Pad the last frame if necessary
-            input_buffer.fill(0.0);
-            for (i, &sample) in chunk.iter().enumerate() {
-                if i < frame_size {
-                    input_buffer[i] = sample;
-                }
-            }
+        for chunk in samples.chunks(chunk_size) {
+            // Convert to the format expected by vorbis_rs (Vec<Vec<f32>> for multi-channel)
+            let mono_samples = vec![chunk.to_vec()];
 
-            // Encode frame with Opus
-            let encoded_size = opus_encoder.encode_float(&input_buffer, &mut output_buffer)?;
+            // Encode the chunk
+            encoder.encode_audio_block(mono_samples)?;
 
-            if encoded_size > 0 {
-                // Determine packet end info
-                let is_last_packet = chunk_idx + 1 >= total_frames;
-                let packet_end_info = if is_last_packet {
-                    PacketWriteEndInfo::EndStream
-                } else {
-                    PacketWriteEndInfo::NormalPacket
-                };
+            chunks_processed += 1;
 
-                // Calculate granule position (sample position)
-                let granule_pos = (frames_encoded as u64 + 1) * frame_size as u64;
+            // Estimate current file size (rough estimation during encoding)
+            let progress_ratio = chunks_processed as f64 / total_chunks as f64;
+            let estimated_current_size =
+                (self.estimate_file_size(duration_seconds) as f64 * progress_ratio) as u64;
 
-                // Write packet to OGG stream
-                packet_writer.write_packet(
-                    output_buffer[..encoded_size].to_vec(),
-                    stream_serial,
-                    packet_end_info,
-                    granule_pos,
-                )?;
+            // Send progress event
+            if let Some(ref sender) = event_sender {
+                let _ = sender.send(EncodingEvent::Progress {
+                    bytes_processed: estimated_current_size,
+                    estimated_total: self.estimate_file_size(duration_seconds),
+                });
 
-                bytes_written += encoded_size as u64;
-                frames_encoded += 1;
-
-                // Update size forecast using running average
-                let current_forecast =
-                    self.update_size_forecast(frames_encoded, bytes_written, total_frames);
-
-                // Send progress event
-                if let Some(ref sender) = event_sender {
-                    let _ = sender.send(EncodingEvent::Progress {
-                        bytes_processed: bytes_written,
-                        estimated_total: current_forecast,
+                // Send size warning if approaching limit
+                if !size_warning_sent && estimated_current_size > self.size_limit {
+                    size_warning_sent = true;
+                    let _ = sender.send(EncodingEvent::SizeAlmostLimit {
+                        estimated_size: estimated_current_size,
                     });
-
-                    // Send size warning if approaching limit
-                    if !size_warning_sent && current_forecast > self.size_limit {
-                        size_warning_sent = true;
-                        let _ = sender.send(EncodingEvent::SizeAlmostLimit {
-                            estimated_size: current_forecast,
-                        });
-                    }
                 }
             }
         }
 
-        // Finalize the OGG stream
-        let mut output_writer = packet_writer.into_inner();
-        output_writer.flush()?;
+        // Finalize the encoder (this writes remaining data and closes the stream)
+        encoder.finish()?;
 
         // Get actual file size
         let actual_size = std::fs::metadata(&output_path)?.len();
-        let final_forecast = self.update_size_forecast(frames_encoded, bytes_written, total_frames);
+        let final_estimate = self.estimate_file_size(duration_seconds);
 
         // Check forecast accuracy (should be ≤2% error)
         let forecast_error = if actual_size > 0 {
-            ((final_forecast as f64 - actual_size as f64).abs() / actual_size as f64) * 100.0
+            ((final_estimate as f64 - actual_size as f64).abs() / actual_size as f64) * 100.0
         } else {
             0.0
         };
@@ -280,7 +231,7 @@ impl Encoder for OggOpusEncoder {
         println!("Encoding completed. Forecast error: {:.2}%", forecast_error);
 
         let ogg_info = OggInfo {
-            size_estimate: final_forecast,
+            size_estimate: final_estimate,
             path: output_path,
             actual_size: Some(actual_size),
         };
@@ -340,7 +291,7 @@ mod tests {
         // Create a short (0.5 second) test WAV
         create_test_wav(&wav_path, 0.5, 48000)?;
 
-        let encoder = OggOpusEncoder::new();
+        let encoder = OggVorbisEncoder::new();
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         let result = encoder.encode(&wav_path, Some(&ogg_path), Some(tx)).await?;
@@ -368,7 +319,7 @@ mod tests {
         // Create a longer (30 second) test WAV
         create_test_wav(&wav_path, 30.0, 48000)?;
 
-        let encoder = OggOpusEncoder::new();
+        let encoder = OggVorbisEncoder::new();
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         let result = encoder.encode(&wav_path, None, Some(tx)).await?;
@@ -397,7 +348,7 @@ mod tests {
         // Create a 5-second test WAV
         create_test_wav(&wav_path, 5.0, 48000)?;
 
-        let encoder = OggOpusEncoder::new();
+        let encoder = OggVorbisEncoder::new();
         let result = encoder.encode(&wav_path, None, None).await?;
 
         let actual_size = result.actual_size.unwrap() as f64;

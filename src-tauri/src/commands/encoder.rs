@@ -1,17 +1,18 @@
-use crate::audio::{Encoder, EncodingEvent, OggInfo, OggOpusEncoder};
+use crate::audio::{Encoder, EncodingEvent, OggInfo, OggVorbisEncoder};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
-/// Encode a WAV file to OGG/Opus format
+/// Encode a WAV file to OGG/Vorbis format
+/// This command encodes a WAV file using the OggVorbisEncoder
 #[tauri::command]
 pub async fn encode_wav_to_ogg(
     wav_path: String,
     output_path: Option<String>,
 ) -> Result<OggInfo, String> {
-    let wav_path = PathBuf::from(wav_path);
+    let input_path = PathBuf::from(wav_path);
     let output_path = output_path.map(PathBuf::from);
 
-    let encoder = OggOpusEncoder::new();
+    let encoder = OggVorbisEncoder::new();
 
     // Create a channel for progress events (optional for this command)
     let (tx, mut rx) = mpsc::unbounded_channel();
@@ -43,7 +44,7 @@ pub async fn encode_wav_to_ogg(
     });
 
     encoder
-        .encode(&wav_path, output_path.as_deref(), Some(tx))
+        .encode(&input_path, output_path.as_deref(), Some(tx))
         .await
         .map_err(|e| e.to_string())
 }
@@ -54,7 +55,7 @@ pub fn get_encoder_info() -> serde_json::Value {
     serde_json::json!({
         "default_bitrate": 32000,
         "supported_formats": ["WAV"],
-        "output_format": "OGG/Opus",
+        "output_format": "OGG/Vorbis",
         "size_limit_mb": 23,
         "forecast_accuracy": "≤2%"
     })

@@ -1,4 +1,4 @@
-use crate::audio::{Encoder, OggOpusEncoder};
+use crate::audio::{Encoder, OggVorbisEncoder};
 use crate::services::{OpenAIWhisperClient, TranscriptionResponse, WhisperClient, WhisperError};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -85,7 +85,7 @@ pub async fn transcribe_recorded_audio(
 
         // Step 1: Encode WAV to OGG
         eprintln!("🎵 Step 1: Starting WAV to OGG encoding...");
-        let encoder = OggOpusEncoder::new();
+        let encoder = OggVorbisEncoder::new();
         let ogg_info = encoder
             .encode(&wav_path, None, None)
             .await
@@ -199,7 +199,7 @@ pub async fn transcribe_recorded_audio(
 #[tauri::command]
 pub fn get_whisper_info() -> serde_json::Value {
     serde_json::json!({
-        "supported_formats": ["OGG/Opus"],
+        "supported_formats": ["OGG/Vorbis"],
         "max_file_size_mb": 25,
         "max_duration_seconds": 600,
         "models": ["whisper-1"],

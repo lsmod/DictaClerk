@@ -34,7 +34,7 @@ tempfile = "3.8"
 async-trait = "0.1"
 thiserror = "1.0"
 # Audio encoding dependencies
-opus = "0.3"
+vorbis_rs = "0.5.5"
 ogg = "0.9"
 byteorder = "1.5"
 # HTTP client for Whisper API

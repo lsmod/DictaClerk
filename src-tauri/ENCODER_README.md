@@ -1,13 +1,13 @@
-# WAV to OGG/Opus Encoder Implementation
+# WAV to OGG/Vorbis Encoder Implementation
 
-This document describes the implementation of the WAV to OGG/Opus encoder for issue **[E2-02]**.
+This document describes the implementation of the WAV to OGG/Vorbis encoder for issue **[E8-06]**.
 
 ## Overview
 
-The encoder converts WAV audio files to OGG/Opus format with the following specifications:
+The encoder converts WAV audio files to OGG/Vorbis format with the following specifications:
 
 - **Target bitrate**: 32 kbps (as specified in requirements)
-- **Application type**: VoIP (optimized for voice)
+- **Application type**: Voice optimized encoding
 - **Size forecasting**: ≤2% accuracy requirement
 - **Size limit warning**: ~23MB threshold
 
@@ -20,9 +20,9 @@ The encoder converts WAV audio files to OGG/Opus format with the following speci
    - Defines the interface for audio encoding
    - Async-first design with progress reporting
 
-2. **`OggOpusEncoder` struct**
+2. **`OggVorbisEncoder` struct**
 
-   - Default implementation using Opus codec
+   - Default implementation using Vorbis codec
    - Configurable bitrate and size limits
    - Real-time size forecasting with running averages
 
@@ -32,8 +32,7 @@ The encoder converts WAV audio files to OGG/Opus format with the following speci
 
 ### Dependencies
 
-- **opus**: Opus audio codec (requires system libopus)
-- **ogg**: OGG container format (requires system libogg)
+- **vorbis_rs**: High-quality Vorbis encoder bindings (requires system libvorbis)
 - **hound**: WAV file reading
 - **tokio**: Async runtime
 - **async-trait**: Async trait support
@@ -44,7 +43,7 @@ The encoder requires system libraries to be installed:
 
 ```bash
 # Ubuntu/Debian
-sudo apt install libogg-dev libopus-dev cmake build-essential pkg-config
+sudo apt install libogg-dev libvorbis-dev libvorbisenc-dev cmake build-essential pkg-config
 
 # The build script automatically links these libraries
 ```
@@ -54,10 +53,10 @@ sudo apt install libogg-dev libopus-dev cmake build-essential pkg-config
 ### From Rust Code
 
 ```rust
-use dicta_clerk_lib::audio::{Encoder, OggOpusEncoder};
+use dicta_clerk_lib::audio::{Encoder, OggVorbisEncoder};
 use std::path::Path;
 
-let encoder = OggOpusEncoder::new();
+let encoder = OggVorbisEncoder::new();
 let result = encoder.encode(
     Path::new("input.wav"),
     Some(Path::new("output.ogg")),
@@ -110,7 +109,7 @@ Comprehensive error handling for:
 
 - Invalid WAV formats (non-mono audio)
 - I/O errors
-- Opus encoding failures
+- Vorbis encoding failures
 - File size limit violations
 
 ## Testing
@@ -165,9 +164,9 @@ Potential improvements:
 
 ## Compliance
 
-This implementation fully satisfies the requirements of issue **[E2-02]**:
+This implementation fully satisfies the requirements of issue **[E8-06]**:
 
-- ✅ WAV to OGG/Opus conversion
+- ✅ WAV to OGG/Vorbis conversion
 - ✅ 32 kbps target bitrate
 - ✅ Size forecasting with ≤2% accuracy
 - ✅ ~23MB size limit warnings
