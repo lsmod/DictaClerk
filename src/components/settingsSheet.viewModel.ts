@@ -392,6 +392,19 @@ export function useSettingsSheetViewModel(onClose: () => void) {
               apiKey: settings.whisper.api_key,
             })
             console.log('Whisper client reinitialized with new API key')
+
+            // Also reinitialize GPT client with the same API key
+            try {
+              await invoke('init_gpt_client', {
+                apiKey: settings.whisper.api_key,
+              })
+              console.log('GPT client reinitialized with new API key')
+            } catch (gptError) {
+              console.warn(
+                'GPT client reinitialization failed (non-critical):',
+                gptError
+              )
+            }
           } catch (whisperError) {
             console.error(
               'Failed to reinitialize Whisper client:',
@@ -441,6 +454,19 @@ export function useSettingsSheetViewModel(onClose: () => void) {
           apiKey: settings.whisper.api_key,
         })
         console.log('API key test successful - Whisper client initialized')
+
+        // Also initialize GPT client with the same API key
+        try {
+          await invoke('init_gpt_client', {
+            apiKey: settings.whisper.api_key,
+          })
+          console.log('GPT client initialized successfully')
+        } catch (gptError) {
+          console.warn(
+            'GPT client initialization failed (non-critical):',
+            gptError
+          )
+        }
 
         setSaveSuccess(true)
         setTimeout(() => setSaveSuccess(false), 3000)

@@ -124,11 +124,14 @@ impl ClipboardService for TauriClipboardService {
         self.validate_text(text)?;
 
         eprintln!("🔍 CLIPBOARD DEBUG: TauriClipboardService::copy() called");
-        eprintln!("   📊 Input text length: {} characters", text.len());
+        eprintln!(
+            "   📊 Input text length: {} characters",
+            text.chars().count()
+        );
         eprintln!("   📊 Input text bytes: {} bytes", text.len());
         if !text.is_empty() {
-            let preview_len = std::cmp::min(50, text.len());
-            eprintln!("   📝 Text preview: {:?}", &text[..preview_len]);
+            let preview_chars: String = text.chars().take(50).collect();
+            eprintln!("   📝 Text preview: {:?}", preview_chars);
         }
 
         // Check if we have an app handle for real clipboard access
@@ -168,14 +171,15 @@ impl ClipboardService for TauriClipboardService {
                     eprintln!("   ⚠️  WARNING: This is a PLACEHOLDER implementation!");
                     eprintln!("   ⚠️  The text is NOT actually copied to system clipboard");
                     eprintln!("   ⚠️  AppHandle needed for real clipboard access");
-                    let display_text = if text.len() <= 100 {
+                    let display_text = if text.chars().count() <= 100 {
                         text.to_string()
                     } else {
-                        format!("{}...", &text[..100])
+                        let truncated: String = text.chars().take(100).collect();
+                        format!("{}...", truncated)
                     };
                     eprintln!(
                         "   📝 WOULD copy {} characters to clipboard: {:?}",
-                        text.len(),
+                        text.chars().count(),
                         display_text
                     );
                     Ok(())

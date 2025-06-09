@@ -1,4 +1,5 @@
 pub mod clipboard_svc;
+pub mod gpt_client;
 pub mod notifier;
 pub mod profile_engine;
 pub mod shortcut_mgr;
@@ -9,6 +10,7 @@ pub mod whisper_client;
 pub use clipboard_svc::{
     ClipboardError, ClipboardResult, ClipboardService, MockClipboardService, TauriClipboardService,
 };
+pub use gpt_client::{GptClient, GptError, GptResult};
 pub use notifier::{
     MockNotifierService, NotificationLevel, Notifier, NotifierError, NotifierResult,
     TauriNotifierService,

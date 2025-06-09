@@ -40,6 +40,8 @@ ogg = "0.9"
 byteorder = "1.5"
 # HTTP client for Whisper API
 reqwest = { version = "0.12", features = ["json", "multipart"] }
+# Logging
+log = "0.4"
 
 [dev-dependencies]
 serial_test = "3.0"

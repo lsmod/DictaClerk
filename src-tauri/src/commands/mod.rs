@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod clipboard;
 pub mod encoder;
+pub mod gpt;
 pub mod profiles;
 pub mod settings;
 pub mod shortcut;
@@ -15,6 +16,9 @@ pub use clipboard::{
     ClipboardServiceState,
 };
 pub use encoder::{encode_wav_to_ogg, get_encoder_info};
+pub use gpt::{
+    format_text_with_gpt, get_gpt_info, init_gpt_client, is_gpt_initialized, GptClientState,
+};
 pub use profiles::{
     apply_profile_to_text, get_active_profile, load_profiles, select_profile, ProfileAppState,
 };
@@ -45,13 +49,14 @@ use crate::audio::AudioCapture;
 use crate::services::ProfileEngine;
 use tauri::State;
 
-/// Complete workflow: Stop recording → Transcribe → Apply profile → Copy to clipboard
+/// Complete workflow: Stop recording → Transcribe → GPT-4 Format → Copy to clipboard
 #[tauri::command]
 pub async fn stop_recording_and_process_to_clipboard(
     audio_state: State<'_, AudioCaptureState>,
     whisper_state: State<'_, WhisperClientState>,
     clipboard_state: State<'_, ClipboardServiceState>,
     profile_state: State<'_, ProfileAppState>,
+    gpt_state: State<'_, GptClientState>,
 ) -> Result<String, String> {
     eprintln!("🔄 Starting complete workflow...");
 
@@ -115,27 +120,34 @@ pub async fn stop_recording_and_process_to_clipboard(
         active_profile_id
     );
 
-    // 3. Get profile prompt if available
-    eprintln!("💭 Step 3: Loading profile prompt...");
-    let prompt = if let Some(profile_id) = &active_profile_id {
+    // 3. Load profile data if available
+    eprintln!("💭 Step 3: Loading profile data...");
+    let (profile_data, prompt) = if let Some(profile_id) = &active_profile_id {
         // Load profiles to get the profile data
         match load_profiles().await {
             Ok(profile_collection) => {
                 let engine = ProfileEngine::new();
-                engine
-                    .find_profile_by_id(&profile_collection, profile_id)
-                    .ok()
-                    .and_then(|p| p.prompt.clone())
+                match engine.find_profile_by_id(&profile_collection, profile_id) {
+                    Ok(profile) => {
+                        let prompt = profile.prompt.clone();
+                        eprintln!("✅ Found profile: {} (ID: {})", profile.name, profile.id);
+                        (Some(profile.clone()), prompt)
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Warning: Profile not found: {}", e);
+                        (None, None)
+                    }
+                }
             }
             Err(e) => {
                 eprintln!("⚠️  Warning: Failed to load profiles: {}", e);
-                None
+                (None, None)
             }
         }
     } else {
-        None
+        (None, None)
     };
-    eprintln!("✅ Step 3 complete: Prompt: {:?}", prompt);
+    eprintln!("✅ Step 3 complete: Profile loaded");
 
     // 4. Check if whisper client is initialized
     eprintln!("🤖 Step 4: Checking Whisper client...");
@@ -168,46 +180,82 @@ pub async fn stop_recording_and_process_to_clipboard(
         transcript.text.len()
     );
 
-    // 6. Apply active profile to the transcribed text
-    eprintln!("⚙️  Step 6: Applying profile formatting...");
-    let processed_text = if let Some(active_profile_id) = active_profile_id {
-        // Apply profile using the existing apply_profile_to_text command
-        apply_profile_to_text(active_profile_id, transcript.text)
+    // 6. Apply GPT-4 formatting (conditional)
+    eprintln!("🤖 Step 6: Checking for GPT-4 formatting...");
+    let final_text = if let Some(profile) = profile_data {
+        if profile.id == "1" {
+            // Profile 1 = clipboard profile - no GPT-4 formatting
+            eprintln!("ℹ️  Using clipboard profile (ID: 1) - skipping GPT-4 formatting");
+            transcript.text
+        } else if !profile.prompt.as_ref().unwrap_or(&String::new()).is_empty() {
+            // Use GPT-4 formatting
+            eprintln!(
+                "🧠 Attempting GPT-4 formatting with profile: {}",
+                profile.name
+            );
+            match format_text_with_gpt(
+                transcript.text.clone(),
+                profile.prompt.unwrap_or_default(),
+                profile.example_input.unwrap_or_default(),
+                profile.example_output.unwrap_or_default(),
+                gpt_state,
+            )
             .await
-            .map_err(|e| {
-                let error_msg = format!("Profile application failed: {}", e);
-                eprintln!("❌ Error: {}", error_msg);
-                error_msg
-            })?
+            {
+                Ok(formatted) => {
+                    eprintln!("✅ GPT-4 formatting successful");
+                    eprintln!(
+                        "🔍 GPT-4 formatted text: {}",
+                        &formatted.chars().take(100).collect::<String>()
+                    );
+                    formatted
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  GPT-4 formatting failed, using original transcript: {}",
+                        e
+                    );
+                    transcript.text // Fallback to original
+                }
+            }
+        } else {
+            // Profile has no prompt - use original transcript
+            eprintln!("ℹ️  Profile has no prompt - using original transcript");
+            transcript.text
+        }
     } else {
-        // No active profile, use raw transcript
-        eprintln!("ℹ️  No active profile, using raw transcript");
+        // No profile selected - use original transcript
+        eprintln!("ℹ️  No profile selected - using original transcript");
         transcript.text
     };
     eprintln!(
-        "✅ Step 6 complete: Processed {} characters",
-        processed_text.len()
+        "✅ Step 6 complete: Final text ready ({} characters)",
+        final_text.len()
     );
 
     // 7. Copy processed text to clipboard
     eprintln!("📋 Step 7: Copying to clipboard...");
     eprintln!("🔍 DEBUG: Clipboard content analysis:");
-    eprintln!("   📊 Text length: {} characters", processed_text.len());
-    eprintln!("   📊 Text bytes: {} bytes", processed_text.len());
-    if !processed_text.is_empty() {
-        let preview_len = std::cmp::min(100, processed_text.len());
+    eprintln!(
+        "   📊 Text length: {} characters",
+        final_text.chars().count()
+    );
+    eprintln!("   📊 Text bytes: {} bytes", final_text.len());
+    if !final_text.is_empty() {
+        let preview_chars = final_text.chars().take(100).collect::<String>();
         eprintln!(
             "   📝 First {} chars: {:?}",
-            preview_len,
-            &processed_text[..preview_len]
+            preview_chars.chars().count(),
+            preview_chars
         );
-        if processed_text.len() > 100 {
-            let end_start = std::cmp::max(0, processed_text.len().saturating_sub(50));
-            eprintln!("   📝 Last 50 chars: {:?}", &processed_text[end_start..]);
+        if final_text.chars().count() > 100 {
+            let last_chars = final_text.chars().rev().take(50).collect::<Vec<_>>();
+            let last_chars_str: String = last_chars.into_iter().rev().collect();
+            eprintln!("   📝 Last 50 chars: {:?}", last_chars_str);
         }
-        eprintln!("   🔤 Contains newlines: {}", processed_text.contains('\n'));
-        eprintln!("   🔤 Contains tabs: {}", processed_text.contains('\t'));
-        eprintln!("   🔤 Non-ASCII chars: {}", !processed_text.is_ascii());
+        eprintln!("   🔤 Contains newlines: {}", final_text.contains('\n'));
+        eprintln!("   🔤 Contains tabs: {}", final_text.contains('\t'));
+        eprintln!("   🔤 Non-ASCII chars: {}", !final_text.is_ascii());
     } else {
         eprintln!("   ⚠️  WARNING: Empty text being copied to clipboard!");
     }
@@ -216,7 +264,7 @@ pub async fn stop_recording_and_process_to_clipboard(
         let clipboard_guard = clipboard_state.lock().await;
         if let Some(ref clipboard) = *clipboard_guard {
             eprintln!("   📋 Attempting clipboard copy...");
-            clipboard.copy(&processed_text).await.map_err(|e| {
+            clipboard.copy(&final_text).await.map_err(|e| {
                 let error_msg = format!("Failed to copy to clipboard: {}", e);
                 eprintln!("❌ Error: {}", error_msg);
                 error_msg

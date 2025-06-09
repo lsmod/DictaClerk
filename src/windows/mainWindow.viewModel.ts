@@ -78,10 +78,10 @@ export function useMainWindowViewModel() {
         console.error('Failed to initialize shortcut manager:', error)
       }
 
-      // Initialize Whisper client if API key is available
+      // Initialize Whisper and GPT clients if API key is available
       try {
         const settings = await invoke('load_settings')
-        console.log('Loaded settings for Whisper initialization')
+        console.log('Loaded settings for client initialization')
 
         if (settings && typeof settings === 'object' && 'whisper' in settings) {
           const whisperSettings = settings.whisper as { api_key?: string }
@@ -89,18 +89,30 @@ export function useMainWindowViewModel() {
             whisperSettings.api_key &&
             whisperSettings.api_key.trim() !== ''
           ) {
+            // Initialize Whisper client
             await invoke('init_whisper_client', {
               apiKey: whisperSettings.api_key,
             })
             console.log('Whisper client initialized successfully')
+
+            // Initialize GPT client with the same API key
+            try {
+              await invoke('init_gpt_client', {
+                apiKey: whisperSettings.api_key,
+              })
+              console.log('GPT client initialized successfully')
+            } catch (gptError) {
+              console.warn(
+                'GPT client initialization failed (non-critical):',
+                gptError
+              )
+            }
           } else {
-            console.log(
-              'No API key found in settings, Whisper client not initialized'
-            )
+            console.log('No API key found in settings, clients not initialized')
           }
         }
       } catch (error) {
-        console.error('Failed to initialize Whisper client:', error)
+        console.error('Failed to initialize clients:', error)
       }
 
       // Initialize clipboard service

@@ -5,10 +5,11 @@ pub mod services;
 
 use commands::{
     apply_profile_to_text, auto_init_shortcut_mgr, check_shortcut_available, close_settings_window,
-    copy_to_clipboard, encode_wav_to_ogg, get_active_profile, get_clipboard_info, get_encoder_info,
-    get_shortcut_status, get_whisper_info, handle_window_close, hide_main_window,
-    init_audio_capture, init_clipboard_service, init_shortcut_mgr, init_system_tray,
-    init_whisper_client, is_clipboard_initialized, is_recording, is_settings_window_open,
+    copy_to_clipboard, encode_wav_to_ogg, format_text_with_gpt, get_active_profile,
+    get_clipboard_info, get_encoder_info, get_gpt_info, get_shortcut_status, get_whisper_info,
+    handle_window_close, hide_main_window, init_audio_capture, init_clipboard_service,
+    init_gpt_client, init_shortcut_mgr, init_system_tray, init_whisper_client,
+    is_clipboard_initialized, is_gpt_initialized, is_recording, is_settings_window_open,
     is_whisper_initialized, is_window_hidden, load_profiles, load_settings, open_settings_window,
     register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
     save_profiles, save_settings, select_profile, show_main_window,
@@ -18,7 +19,7 @@ use commands::{
     unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
     update_global_shortcut, update_tray_global_shortcut, update_tray_status, v1_save_profiles,
     v1_save_settings, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
-    ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
+    GptClientState, ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
 use std::sync::Arc;
@@ -45,6 +46,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(Arc::new(Mutex::new(None)) as AudioCaptureState)
         .manage(Arc::new(Mutex::new(None)) as WhisperClientState)
+        .manage(Arc::new(Mutex::new(None)) as GptClientState)
         .manage(Arc::new(Mutex::new(None)) as ShortcutMgrState)
         .manage(Arc::new(Mutex::new(None)) as ClipboardServiceState)
         .manage(Arc::new(Mutex::new(None)) as SystemTrayState)
@@ -66,6 +68,10 @@ pub fn run() {
             transcribe_recorded_audio,
             get_whisper_info,
             is_whisper_initialized,
+            init_gpt_client,
+            format_text_with_gpt,
+            get_gpt_info,
+            is_gpt_initialized,
             init_shortcut_mgr,
             auto_init_shortcut_mgr,
             toggle_record,

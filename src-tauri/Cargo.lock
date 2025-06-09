@@ -911,6 +911,7 @@ dependencies = [
  "cpal",
  "hound",
  "jsonschema",
+ "log",
  "ogg",
  "reqwest",
  "serde",
