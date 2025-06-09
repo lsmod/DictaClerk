@@ -15,6 +15,8 @@
 //! ```
 
 use async_trait::async_trait;
+use tauri::AppHandle;
+use tauri_plugin_clipboard_manager::ClipboardExt;
 use thiserror::Error;
 
 /// Errors that can occur during clipboard operations
@@ -60,21 +62,36 @@ pub trait ClipboardService: Send + Sync {
 
 /// Production implementation using Tauri's clipboard API
 pub struct TauriClipboardService {
+    /// Tauri app handle for clipboard access
+    app_handle: Option<AppHandle>,
     /// Maximum text length to prevent system issues (default: 100MB)
     max_text_length: usize,
 }
 
 impl TauriClipboardService {
     /// Create a new TauriClipboardService with default configuration
+    /// Note: For testing without AppHandle
     pub fn new() -> Self {
         Self {
+            app_handle: None,
+            max_text_length: 100 * 1024 * 1024, // 100MB
+        }
+    }
+
+    /// Create a new TauriClipboardService with AppHandle for production use
+    pub fn with_app_handle(app_handle: AppHandle) -> Self {
+        Self {
+            app_handle: Some(app_handle),
             max_text_length: 100 * 1024 * 1024, // 100MB
         }
     }
 
     /// Create a new TauriClipboardService with custom maximum text length
     pub fn with_max_length(max_text_length: usize) -> Self {
-        Self { max_text_length }
+        Self {
+            app_handle: None,
+            max_text_length,
+        }
     }
 
     /// Validate text before copying
@@ -106,31 +123,63 @@ impl ClipboardService for TauriClipboardService {
         // Validate input
         self.validate_text(text)?;
 
-        // Note: This is a placeholder for the actual Tauri clipboard implementation
-        // The actual implementation will use tauri::AppHandle and clipboard API
-        // For now, we'll simulate the operation
-        match std::env::var("CLIPBOARD_TEST_MODE") {
-            Ok(mode) if mode == "fail" => {
-                return Err(ClipboardError::ClipboardAccessFailed {
-                    message: "Test mode clipboard failure".to_string(),
-                });
-            }
-            Ok(mode) if mode == "unavailable" => {
-                return Err(ClipboardError::ClipboardNotAvailable);
-            }
-            _ => {
-                // In production, this would use:
-                // app_handle.clipboard().write_text(text)
-                //     .map_err(|e| ClipboardError::SystemError {
-                //         message: e.to_string()
-                //     })?;
+        eprintln!("🔍 CLIPBOARD DEBUG: TauriClipboardService::copy() called");
+        eprintln!("   📊 Input text length: {} characters", text.len());
+        eprintln!("   📊 Input text bytes: {} bytes", text.len());
+        if !text.is_empty() {
+            let preview_len = std::cmp::min(50, text.len());
+            eprintln!("   📝 Text preview: {:?}", &text[..preview_len]);
+        }
 
-                // For development without full Tauri context, we'll log
-                eprintln!(
-                    "CLIPBOARD: Would copy {} characters to clipboard",
-                    text.len()
-                );
-                Ok(())
+        // Check if we have an app handle for real clipboard access
+        if let Some(ref app_handle) = self.app_handle {
+            eprintln!("   📋 Using real Tauri clipboard API");
+
+            // Use Tauri's clipboard extension trait
+            match app_handle.clipboard().write_text(text.to_string()) {
+                Ok(_) => {
+                    eprintln!("   ✅ Successfully copied to system clipboard via Tauri API");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("   ❌ Tauri clipboard API error: {}", e);
+                    Err(ClipboardError::SystemError {
+                        message: format!("Tauri clipboard API failed: {}", e),
+                    })
+                }
+            }
+        } else {
+            // Fallback for testing or when no app handle is available
+            eprintln!("   ⚠️  No AppHandle available - using fallback mode");
+
+            // Check for test mode environment variables
+            match std::env::var("CLIPBOARD_TEST_MODE") {
+                Ok(mode) if mode == "fail" => {
+                    eprintln!("   ❌ CLIPBOARD TEST MODE: Simulating failure");
+                    return Err(ClipboardError::ClipboardAccessFailed {
+                        message: "Test mode clipboard failure".to_string(),
+                    });
+                }
+                Ok(mode) if mode == "unavailable" => {
+                    eprintln!("   ❌ CLIPBOARD TEST MODE: Simulating unavailable");
+                    return Err(ClipboardError::ClipboardNotAvailable);
+                }
+                _ => {
+                    eprintln!("   ⚠️  WARNING: This is a PLACEHOLDER implementation!");
+                    eprintln!("   ⚠️  The text is NOT actually copied to system clipboard");
+                    eprintln!("   ⚠️  AppHandle needed for real clipboard access");
+                    let display_text = if text.len() <= 100 {
+                        text.to_string()
+                    } else {
+                        format!("{}...", &text[..100])
+                    };
+                    eprintln!(
+                        "   📝 WOULD copy {} characters to clipboard: {:?}",
+                        text.len(),
+                        display_text
+                    );
+                    Ok(())
+                }
             }
         }
     }

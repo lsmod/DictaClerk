@@ -2,7 +2,7 @@ use crate::services::{
     ClipboardError, ClipboardService, MockNotifierService, Notifier, TauriClipboardService,
 };
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::Mutex;
 
 /// Global state for the clipboard service
@@ -11,10 +11,11 @@ pub type ClipboardServiceState = Arc<Mutex<Option<Arc<dyn ClipboardService + Sen
 /// Initialize the clipboard service
 #[tauri::command]
 pub async fn init_clipboard_service(
+    app_handle: AppHandle,
     state: State<'_, ClipboardServiceState>,
 ) -> Result<String, String> {
-    let clipboard_service =
-        Arc::new(TauriClipboardService::new()) as Arc<dyn ClipboardService + Send + Sync>;
+    let clipboard_service = Arc::new(TauriClipboardService::with_app_handle(app_handle))
+        as Arc<dyn ClipboardService + Send + Sync>;
     let mut state_guard = state.lock().await;
     *state_guard = Some(clipboard_service);
 

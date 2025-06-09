@@ -191,14 +191,37 @@ pub async fn stop_recording_and_process_to_clipboard(
 
     // 7. Copy processed text to clipboard
     eprintln!("📋 Step 7: Copying to clipboard...");
+    eprintln!("🔍 DEBUG: Clipboard content analysis:");
+    eprintln!("   📊 Text length: {} characters", processed_text.len());
+    eprintln!("   📊 Text bytes: {} bytes", processed_text.len());
+    if !processed_text.is_empty() {
+        let preview_len = std::cmp::min(100, processed_text.len());
+        eprintln!(
+            "   📝 First {} chars: {:?}",
+            preview_len,
+            &processed_text[..preview_len]
+        );
+        if processed_text.len() > 100 {
+            let end_start = std::cmp::max(0, processed_text.len().saturating_sub(50));
+            eprintln!("   📝 Last 50 chars: {:?}", &processed_text[end_start..]);
+        }
+        eprintln!("   🔤 Contains newlines: {}", processed_text.contains('\n'));
+        eprintln!("   🔤 Contains tabs: {}", processed_text.contains('\t'));
+        eprintln!("   🔤 Non-ASCII chars: {}", !processed_text.is_ascii());
+    } else {
+        eprintln!("   ⚠️  WARNING: Empty text being copied to clipboard!");
+    }
+
     {
         let clipboard_guard = clipboard_state.lock().await;
         if let Some(ref clipboard) = *clipboard_guard {
+            eprintln!("   📋 Attempting clipboard copy...");
             clipboard.copy(&processed_text).await.map_err(|e| {
                 let error_msg = format!("Failed to copy to clipboard: {}", e);
                 eprintln!("❌ Error: {}", error_msg);
                 error_msg
             })?;
+            eprintln!("   ✅ Clipboard copy operation completed successfully");
         } else {
             let error_msg = "Clipboard service not initialized";
             eprintln!("❌ Error: {}", error_msg);

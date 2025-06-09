@@ -42,6 +42,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(Arc::new(Mutex::new(None)) as AudioCaptureState)
         .manage(Arc::new(Mutex::new(None)) as WhisperClientState)
         .manage(Arc::new(Mutex::new(None)) as ShortcutMgrState)

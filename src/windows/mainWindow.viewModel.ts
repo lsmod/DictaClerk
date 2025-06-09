@@ -103,6 +103,14 @@ export function useMainWindowViewModel() {
         console.error('Failed to initialize Whisper client:', error)
       }
 
+      // Initialize clipboard service
+      try {
+        await invoke('init_clipboard_service')
+        console.log('Clipboard service initialized successfully')
+      } catch (error) {
+        console.error('Failed to initialize clipboard service:', error)
+      }
+
       if (isFirstLaunch) {
         localStorage.setItem('dicta-clerk-first-launch', 'false')
       }
