@@ -60,22 +60,133 @@ pub async fn transcribe_recorded_audio(
     if let Some(ref client) = *state_guard {
         let wav_path = PathBuf::from(wav_file_path);
 
+        // Debug: Check WAV file details
+        eprintln!("🔍 DEBUG: Input WAV file analysis:");
+        eprintln!("   📁 WAV path: {:?}", wav_path);
+        eprintln!(
+            "   📁 WAV absolute path: {:?}",
+            wav_path.canonicalize().unwrap_or_else(|_| wav_path.clone())
+        );
+
+        match tokio::fs::metadata(&wav_path).await {
+            Ok(metadata) => {
+                eprintln!(
+                    "   📊 WAV file size: {} bytes ({:.2} KB)",
+                    metadata.len(),
+                    metadata.len() as f64 / 1024.0
+                );
+                eprintln!("   ✅ WAV file exists and is readable");
+            }
+            Err(e) => {
+                eprintln!("   ❌ WAV file error: {}", e);
+                return Err(format!("WAV file not accessible: {}", e));
+            }
+        }
+
         // Step 1: Encode WAV to OGG
+        eprintln!("🎵 Step 1: Starting WAV to OGG encoding...");
         let encoder = OggOpusEncoder::new();
         let ogg_info = encoder
             .encode(&wav_path, None, None)
             .await
             .map_err(|e| format!("Encoding failed: {}", e))?;
 
+        // Debug: Check OGG file details
+        eprintln!("🔍 DEBUG: Output OGG file analysis:");
+        eprintln!("   📁 OGG path: {:?}", ogg_info.path);
+        eprintln!(
+            "   📁 OGG absolute path: {:?}",
+            ogg_info
+                .path
+                .canonicalize()
+                .unwrap_or_else(|_| ogg_info.path.clone())
+        );
+        eprintln!(
+            "   📊 OGG estimated size: {} bytes ({:.2} KB)",
+            ogg_info.size_estimate,
+            ogg_info.size_estimate as f64 / 1024.0
+        );
+
+        if let Some(actual_size) = ogg_info.actual_size {
+            eprintln!(
+                "   📊 OGG actual size: {} bytes ({:.2} KB)",
+                actual_size,
+                actual_size as f64 / 1024.0
+            );
+        }
+
+        match tokio::fs::metadata(&ogg_info.path).await {
+            Ok(metadata) => {
+                eprintln!(
+                    "   📊 OGG file system size: {} bytes ({:.2} KB)",
+                    metadata.len(),
+                    metadata.len() as f64 / 1024.0
+                );
+                eprintln!("   ✅ OGG file exists and is readable");
+
+                // Check file extension
+                if let Some(extension) = ogg_info.path.extension() {
+                    eprintln!("   🏷️  OGG file extension: {:?}", extension);
+                } else {
+                    eprintln!("   ⚠️  OGG file has no extension");
+                }
+            }
+            Err(e) => {
+                eprintln!("   ❌ OGG file error: {}", e);
+                return Err(format!("OGG file not accessible after encoding: {}", e));
+            }
+        }
+
+        // Try to determine file type using file command (if available)
+        if let Ok(output) = std::process::Command::new("file")
+            .arg(&ogg_info.path)
+            .output()
+        {
+            if let Ok(file_info) = String::from_utf8(output.stdout) {
+                eprintln!("   🔍 File type detection: {}", file_info.trim());
+            }
+        }
+
+        eprintln!("🎵 Encoding completed successfully!");
+        eprintln!("📂 Files for manual inspection:");
+        eprintln!("   Input WAV:  {:?}", wav_path);
+        eprintln!("   Output OGG: {:?}", ogg_info.path);
+        eprintln!("💡 You can now examine these files with audio tools");
+
         // Step 2: Transcribe the OGG file
+        eprintln!("🤖 Step 2: Starting transcription...");
+        eprintln!("   📁 Sending file: {:?}", ogg_info.path);
+        eprintln!("   🎯 Using prompt: {:?}", prompt);
+
         let transcript = client
             .transcribe(&ogg_info.path, prompt)
             .await
-            .map_err(|e| format!("Transcription failed: {}", e))?;
+            .map_err(|e| {
+                eprintln!("❌ Transcription failed for file: {:?}", ogg_info.path);
+                eprintln!("❌ Error details: {}", e);
+                format!("Transcription failed: {}", e)
+            })?;
 
-        // Step 3: Clean up the temporary OGG file (optional)
+        eprintln!("✅ Transcription successful!");
+        eprintln!("   📝 Text length: {} characters", transcript.text.len());
+        eprintln!(
+            "   📝 First 100 chars: {:?}",
+            transcript.text.chars().take(100).collect::<String>()
+        );
+
+        // Step 3: Clean up the temporary OGG file (but warn first)
+        eprintln!("🧹 Step 3: Cleaning up temporary OGG file...");
+        eprintln!("   ⚠️  About to delete: {:?}", ogg_info.path);
+        eprintln!("   💡 If you want to keep the file for inspection, interrupt now!");
+
+        // Give a moment for the user to see the message
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
         if let Err(e) = tokio::fs::remove_file(&ogg_info.path).await {
-            eprintln!("Warning: Failed to clean up temporary OGG file: {}", e);
+            eprintln!("⚠️  Warning: Failed to clean up temporary OGG file: {}", e);
+            eprintln!("   📁 File remains at: {:?}", ogg_info.path);
+        } else {
+            eprintln!("✅ Temporary OGG file cleaned up");
         }
 
         Ok(transcript)

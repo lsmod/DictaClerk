@@ -79,6 +79,31 @@ pub async fn stop_recording_and_process_to_clipboard(
     };
     eprintln!("✅ Step 1 complete: WAV file saved to {:?}", wav_path);
 
+    // Debug: Additional WAV file information
+    match tokio::fs::metadata(&wav_path).await {
+        Ok(metadata) => {
+            eprintln!("🔍 DEBUG: WAV file details:");
+            eprintln!(
+                "   📁 Full path: {:?}",
+                wav_path.canonicalize().unwrap_or_else(|_| wav_path.clone())
+            );
+            eprintln!(
+                "   📊 File size: {} bytes ({:.2} KB)",
+                metadata.len(),
+                metadata.len() as f64 / 1024.0
+            );
+            eprintln!(
+                "   ⏰ Modified: {:?}",
+                metadata
+                    .modified()
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            );
+        }
+        Err(e) => {
+            eprintln!("⚠️  Warning: Could not read WAV file metadata: {}", e);
+        }
+    }
+
     // 2. Get active profile ID first
     eprintln!("👤 Step 2: Getting active profile...");
     let active_profile_id = {
