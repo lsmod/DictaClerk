@@ -2,6 +2,7 @@ pub mod audio;
 pub mod commands;
 pub mod config;
 pub mod services;
+pub mod utils;
 
 use commands::{
     apply_profile_to_text, auto_init_shortcut_mgr, check_shortcut_available, close_settings_window,
@@ -12,8 +13,8 @@ use commands::{
     is_clipboard_initialized, is_gpt_initialized, is_recording, is_settings_window_open,
     is_whisper_initialized, is_window_hidden, load_profiles, load_settings, open_settings_window,
     register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
-    save_profiles, save_settings, select_profile, show_main_window,
-    show_window_and_start_recording, start_capture, stop_capture,
+    save_profiles, save_settings, select_profile, settings::ensure_default_configs,
+    show_main_window, show_window_and_start_recording, start_capture, stop_capture,
     stop_recording_and_process_to_clipboard, subscribe_rms, toggle_main_window, toggle_record,
     toggle_record_with_tray, transcribe_audio, transcribe_recorded_audio,
     unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
@@ -33,6 +34,15 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Ensure default configuration files exist
+    if let Err(e) = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(ensure_default_configs())
+    {
+        eprintln!("Failed to ensure default configs: {}", e);
+        // Don't exit here, let the app continue
+    }
+
     // Validate configuration files before starting the application
     if let Err(e) = validate_config_files() {
         eprintln!("Configuration validation failed: {}", e);

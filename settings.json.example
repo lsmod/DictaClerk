@@ -1,6 +1,6 @@
 {
   "whisper": {
-    "api_key": "your-openai-api-key-here",
+    "api_key": "YOUR_OPENAI_API_KEY_HERE",
     "endpoint": "https://api.openai.com/v1/audio/transcriptions",
     "model": "whisper-1",
     "timeout_seconds": 30,
@@ -19,5 +19,5 @@
     "theme": "auto",
     "auto_start_recording": false
   },
-  "global_shortcut": "CmdOrCtrl+Shift+F9"
+  "global_shortcut": "Ctrl+Shift+F9"
 }

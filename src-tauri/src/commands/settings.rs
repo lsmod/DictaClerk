@@ -7,6 +7,7 @@ use tempfile::NamedTempFile;
 use crate::commands::ShortcutMgrState;
 use crate::services::notifier::{Notifier, TauriNotifierService};
 use crate::services::profile_engine::{ProfileCollection, ProfileEngine};
+use crate::utils::{ensure_config_directory, find_config_file_path};
 
 /// Settings configuration structure matching settings.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,33 +89,101 @@ impl PersistenceError {
     }
 }
 
-/// Find the target path for a config file
-pub fn find_config_file_path(filename: &str) -> Option<PathBuf> {
-    // First try to find existing files in preferred order
-    let possible_paths = vec![
-        PathBuf::from("..").join(filename),    // Project root (preferred)
-        PathBuf::from("../..").join(filename), // Parent of project root
-        PathBuf::from(filename),               // Current directory (last resort)
-    ];
+/// Create default configuration files if they don't exist
+pub async fn ensure_default_configs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Try to create config directory first
+    let config_dir = match ensure_config_directory() {
+        Ok(dir) => dir,
+        Err(e) => {
+            eprintln!("⚠️  Could not create OS config directory: {}", e);
+            eprintln!("📁 Using current directory as fallback");
+            return Ok(()); // Don't fail completely, let normal loading handle it
+        }
+    };
 
-    // Look for existing files first
-    for path in &possible_paths {
-        if path.exists() {
-            return Some(path.clone());
+    // Create default settings.json if it doesn't exist
+    let settings_path = config_dir.join("settings.json");
+    if !settings_path.exists() {
+        let default_settings = SettingsConfig {
+            whisper: WhisperSettings {
+                api_key: "YOUR_OPENAI_API_KEY_HERE".to_string(),
+                endpoint: "https://api.openai.com/v1/audio/transcriptions".to_string(),
+                model: "whisper-1".to_string(),
+                timeout_seconds: 30,
+                max_retries: 3,
+            },
+            audio: AudioSettings {
+                input_device: None,
+                sample_rate: 44100,
+                buffer_size: 1024,
+            },
+            encoding: EncodingSettings {
+                bitrate: 32000,
+                size_limit_mb: 23,
+            },
+            ui: UiSettings {
+                theme: "auto".to_string(),
+                auto_start_recording: false,
+            },
+            global_shortcut: "Ctrl+Shift+F9".to_string(),
+        };
+
+        if let Err(e) = atomic_write_json(&settings_path, &default_settings).await {
+            eprintln!("⚠️  Could not create default settings.json: {}", e);
+        } else {
+            println!(
+                "✅ Created default settings.json at {}",
+                settings_path.display()
+            );
         }
     }
 
-    // If not found, try from current_dir parent (project root)
-    if let Ok(current_dir) = std::env::current_dir() {
-        if let Some(parent) = current_dir.parent() {
-            let config_path = parent.join(filename);
-            // Always prefer the parent directory (project root) for new files
-            return Some(config_path);
+    // Create default profiles.json if it doesn't exist
+    let profiles_path = config_dir.join("profiles.json");
+    if !profiles_path.exists() {
+        let default_profiles = ProfileCollection {
+            profiles: vec![
+                crate::services::profile_engine::Profile {
+                    id: "1".to_string(),
+                    name: "Clipboard".to_string(),
+                    description: Some("Copy transcription directly to clipboard without formatting".to_string()),
+                    prompt: None, // Important: clipboard profile must have no prompt
+                    example_input: None,
+                    example_output: None,
+                    active: false,
+                    visible: Some(true),
+                    shortcut: None,
+                    created_at: "2025-01-01T00:00:00Z".to_string(),
+                    updated_at: "2025-01-01T00:00:00Z".to_string(),
+                },
+                crate::services::profile_engine::Profile {
+                    id: "concise".to_string(),
+                    name: "Concise Messages".to_string(),
+                    description: Some("Make messages more concise and avoid repetitions".to_string()),
+                    prompt: Some("Make this text more concise and remove unnecessary repetitions while preserving the core meaning".to_string()),
+                    example_input: Some("I think that maybe we should probably consider the possibility of potentially implementing this feature".to_string()),
+                    example_output: Some("We should implement this feature".to_string()),
+                    active: true,
+                    visible: Some(true),
+                    shortcut: Some("Ctrl+Alt+C".to_string()),
+                    created_at: "2025-01-01T00:00:00Z".to_string(),
+                    updated_at: "2025-01-01T00:00:00Z".to_string(),
+                },
+            ],
+            default_profile_id: "concise".to_string(),
+        };
+
+        if let Err(e) = atomic_write_json(&profiles_path, &default_profiles).await {
+            eprintln!("⚠️  Could not create default profiles.json: {}", e);
+        } else {
+            println!(
+                "✅ Created default profiles.json at {}",
+                profiles_path.display()
+            );
         }
     }
 
-    // Fallback to project root relative path (avoid current directory if possible)
-    Some(PathBuf::from("..").join(filename))
+    Ok(())
 }
 
 /// Perform atomic write using tempfile + rename
@@ -216,41 +285,13 @@ pub async fn restore_from_backup(
 /// Load settings from settings.json file
 #[tauri::command]
 pub async fn load_settings() -> Result<SettingsConfig, String> {
-    // Try multiple possible paths for settings.json
-    let possible_paths = vec!["settings.json", "../settings.json", "../../settings.json"];
+    // Use the new unified config file search logic
+    let settings_path = find_config_file_path("settings.json")
+        .ok_or_else(|| "Could not determine settings.json path".to_string())?;
 
-    let mut settings_json = None;
-    let mut last_error = String::new();
-
-    // First try the possible relative paths
-    for path in possible_paths {
-        match tokio::fs::read_to_string(path).await {
-            Ok(content) => {
-                settings_json = Some(content);
-                break;
-            }
-            Err(e) => {
-                last_error = format!("Failed to read {}: {}", path, e);
-                continue;
-            }
-        }
-    }
-
-    // If not found, try from current_dir parent
-    if settings_json.is_none() {
-        if let Ok(current_dir) = std::env::current_dir() {
-            if let Some(parent) = current_dir.parent() {
-                let settings_path = parent.join("settings.json");
-                match tokio::fs::read_to_string(&settings_path).await {
-                    Ok(content) => settings_json = Some(content),
-                    Err(e) => last_error = format!("Failed to read {:?}: {}", settings_path, e),
-                }
-            }
-        }
-    }
-
-    let settings_content = settings_json
-        .ok_or_else(|| format!("Could not find settings.json. Last error: {}", last_error))?;
+    let settings_content = tokio::fs::read_to_string(&settings_path)
+        .await
+        .map_err(|e| format!("Failed to read {}: {}", settings_path.display(), e))?;
 
     serde_json::from_str(&settings_content)
         .map_err(|e| format!("Failed to parse settings.json: {}", e))
@@ -298,6 +339,30 @@ pub async fn v1_save_settings(
                     eprintln!("Failed to restore backup: {}", restore_err);
                 }
                 let _ = tokio::fs::remove_file(backup).await;
+            }
+
+            // Handle permission errors with helpful guidance
+            if let PersistenceError::IoError { source, .. } = &e {
+                if source.kind() == ErrorKind::PermissionDenied {
+                    eprintln!("⚠️  Permission denied writing to config directory.");
+                    eprintln!(
+                        "💡 Tip: Grant write permissions with: chmod +w {}",
+                        target_path
+                            .parent()
+                            .unwrap_or_else(|| Path::new("."))
+                            .display()
+                    );
+                    eprintln!("📁 Falling back to current directory");
+
+                    // Try fallback location
+                    let fallback_path = PathBuf::from("settings.json");
+                    if (atomic_write_json(&fallback_path, &settings).await).is_ok() {
+                        return Ok(format!(
+                            "Settings saved to fallback location: {}",
+                            fallback_path.display()
+                        ));
+                    }
+                }
             }
 
             // Show error toast for disk full scenarios
@@ -379,6 +444,30 @@ pub async fn v1_save_profiles(
                     eprintln!("Failed to restore backup: {}", restore_err);
                 }
                 let _ = tokio::fs::remove_file(backup).await;
+            }
+
+            // Handle permission errors with helpful guidance
+            if let PersistenceError::IoError { source, .. } = &e {
+                if source.kind() == ErrorKind::PermissionDenied {
+                    eprintln!("⚠️  Permission denied writing to config directory.");
+                    eprintln!(
+                        "💡 Tip: Grant write permissions with: chmod +w {}",
+                        target_path
+                            .parent()
+                            .unwrap_or_else(|| Path::new("."))
+                            .display()
+                    );
+                    eprintln!("📁 Falling back to current directory");
+
+                    // Try fallback location
+                    let fallback_path = PathBuf::from("profiles.json");
+                    if (atomic_write_json(&fallback_path, &profiles).await).is_ok() {
+                        return Ok(format!(
+                            "Profiles saved to fallback location: {}",
+                            fallback_path.display()
+                        ));
+                    }
+                }
             }
 
             // Show error toast for disk full scenarios

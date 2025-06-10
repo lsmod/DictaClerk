@@ -3,6 +3,7 @@
 //! This module validates settings.json and profiles.json against predefined JSON schemas
 //! to ensure the application starts with valid configurations.
 
+use crate::utils::find_config_file_path;
 use jsonschema::{Draft, JSONSchema};
 use serde_json::Value;
 use std::fs;
@@ -150,7 +151,7 @@ const SETTINGS_SCHEMA: &str = r#"{
     "global_shortcut": {
       "type": "string",
       "minLength": 1,
-      "default": "CmdOrCtrl+Shift+R",
+      "default": "CmdOrCtrl+Shift+F9",
       "description": "Global keyboard shortcut for toggling recording"
     }
   },
@@ -180,11 +181,11 @@ const PROFILES_SCHEMA: &str = r#"{
             "description": "Human-readable profile name"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile description"
           },
           "prompt": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Whisper prompt to guide transcription style"
           },
           "example_input": {
@@ -236,59 +237,26 @@ const PROFILES_SCHEMA: &str = r#"{
 
 /// Validates both configuration files against their schemas
 pub fn validate_config_files() -> Result<(), ConfigError> {
-    // Try to find config files in different possible locations
-    let settings_paths = vec!["settings.json", "../settings.json", "../../settings.json"];
-
-    let profiles_paths = vec!["profiles.json", "../profiles.json", "../../profiles.json"];
-
-    // Try to validate settings.json
-    let mut settings_found = false;
-    for path in &settings_paths {
-        if std::path::Path::new(path).exists() {
-            validate_settings_file(path)?;
-            settings_found = true;
-            break;
+    // Use the new unified search logic for settings.json
+    if let Some(settings_path) = find_config_file_path("settings.json") {
+        if settings_path.exists() {
+            validate_settings_file(&settings_path)?;
+        } else {
+            eprintln!("Warning: settings.json not found at expected location: {}. Skipping settings validation.", settings_path.display());
         }
+    } else {
+        eprintln!("Warning: Could not determine settings.json path. Skipping settings validation.");
     }
 
-    // Also try current directory approach
-    if !settings_found {
-        if let Ok(current_dir) = std::env::current_dir() {
-            let settings_in_current = current_dir.join("settings.json");
-            if settings_in_current.exists() {
-                validate_settings_file(&settings_in_current)?;
-                settings_found = true;
-            }
+    // Use the new unified search logic for profiles.json
+    if let Some(profiles_path) = find_config_file_path("profiles.json") {
+        if profiles_path.exists() {
+            validate_profiles_file(&profiles_path)?;
+        } else {
+            eprintln!("Warning: profiles.json not found at expected location: {}. Skipping profiles validation.", profiles_path.display());
         }
-    }
-
-    if !settings_found {
-        eprintln!("Warning: settings.json not found in any expected location. Skipping settings validation.");
-    }
-
-    // Try to validate profiles.json
-    let mut profiles_found = false;
-    for path in &profiles_paths {
-        if std::path::Path::new(path).exists() {
-            validate_profiles_file(path)?;
-            profiles_found = true;
-            break;
-        }
-    }
-
-    // Also try current directory approach
-    if !profiles_found {
-        if let Ok(current_dir) = std::env::current_dir() {
-            let profiles_in_current = current_dir.join("profiles.json");
-            if profiles_in_current.exists() {
-                validate_profiles_file(&profiles_in_current)?;
-                profiles_found = true;
-            }
-        }
-    }
-
-    if !profiles_found {
-        eprintln!("Warning: profiles.json not found in any expected location. Skipping profiles validation.");
+    } else {
+        eprintln!("Warning: Could not determine profiles.json path. Skipping profiles validation.");
     }
 
     Ok(())
@@ -398,6 +366,9 @@ fn validate_profiles_file<P: AsRef<Path>>(path: P) -> Result<(), ConfigError> {
     // Additional validation: check for shortcut conflicts
     validate_shortcut_conflicts(&json)?;
 
+    // Additional validation: check clipboard profile constraints
+    validate_clipboard_profile_constraints(&json)?;
+
     Ok(())
 }
 
@@ -470,6 +441,63 @@ fn validate_shortcut_conflicts(json: &Value) -> Result<(), ConfigError> {
         }
     }
 
+    Ok(())
+}
+
+/// Validates clipboard profile specific constraints
+fn validate_clipboard_profile_constraints(json: &Value) -> Result<(), ConfigError> {
+    if let Some(profiles) = json.get("profiles").and_then(|p| p.as_array()) {
+        for profile in profiles {
+            if let Some(id) = profile.get("id").and_then(|v| v.as_str()) {
+                if id == "1" {
+                    // This is the clipboard profile - validate its constraints
+
+                    // Name must be "Clipboard"
+                    if let Some(name) = profile.get("name").and_then(|v| v.as_str()) {
+                        if name != "Clipboard" {
+                            return Err(ConfigError::ValidationError {
+                                path: "profiles".to_string(),
+                                message: "Clipboard profile (ID='1') must be named 'Clipboard'"
+                                    .to_string(),
+                            });
+                        }
+                    }
+
+                    // Prompt must be null or absent
+                    if let Some(prompt) = profile.get("prompt") {
+                        if !prompt.is_null() {
+                            return Err(ConfigError::ValidationError {
+                                path: "profiles".to_string(),
+                                message: "Clipboard profile (ID='1') cannot have a prompt"
+                                    .to_string(),
+                            });
+                        }
+                    }
+
+                    // Example fields must be null or absent
+                    if let Some(example_input) = profile.get("example_input") {
+                        if !example_input.is_null() {
+                            return Err(ConfigError::ValidationError {
+                                path: "profiles".to_string(),
+                                message: "Clipboard profile (ID='1') cannot have example_input"
+                                    .to_string(),
+                            });
+                        }
+                    }
+
+                    if let Some(example_output) = profile.get("example_output") {
+                        if !example_output.is_null() {
+                            return Err(ConfigError::ValidationError {
+                                path: "profiles".to_string(),
+                                message: "Clipboard profile (ID='1') cannot have example_output"
+                                    .to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }
 

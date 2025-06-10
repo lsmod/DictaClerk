@@ -48,7 +48,7 @@ impl Default for ProfileEngineConfig {
     }
 }
 
-/// Profile structure matching the JSON schema
+/// Profile structure with strict validation for different profile types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Profile {
     /// Unique profile identifier
@@ -57,7 +57,7 @@ pub struct Profile {
     pub name: String,
     /// Profile description
     pub description: Option<String>,
-    /// Profile instruction/prompt for formatting
+    /// Profile instruction/prompt for formatting (must be None for clipboard profiles)
     pub prompt: Option<String>,
     /// Example input text for this profile
     pub example_input: Option<String>,
@@ -73,6 +73,56 @@ pub struct Profile {
     pub created_at: String,
     /// Profile last update timestamp
     pub updated_at: String,
+}
+
+/// Trait to define profile behavior based on profile type
+pub trait ProfileBehavior {
+    /// Check if this is a clipboard profile (ID "1")
+    fn is_clipboard_profile(&self) -> bool;
+
+    /// Check if this profile should use GPT formatting
+    fn should_use_gpt_formatting(&self) -> bool;
+
+    /// Validate profile constraints based on its type
+    fn validate_constraints(&self) -> Result<(), String>;
+}
+
+impl ProfileBehavior for Profile {
+    fn is_clipboard_profile(&self) -> bool {
+        self.id == "1"
+    }
+
+    fn should_use_gpt_formatting(&self) -> bool {
+        !self.is_clipboard_profile()
+            && self.prompt.is_some()
+            && !self.prompt.as_ref().unwrap().is_empty()
+    }
+
+    fn validate_constraints(&self) -> Result<(), String> {
+        if self.is_clipboard_profile() {
+            // Clipboard profile constraints
+            if self.name != "Clipboard" {
+                return Err("Clipboard profile (ID='1') must be named 'Clipboard'".to_string());
+            }
+            if self.prompt.is_some() {
+                return Err("Clipboard profile cannot have a prompt".to_string());
+            }
+            if self.example_input.is_some() || self.example_output.is_some() {
+                return Err("Clipboard profile cannot have examples".to_string());
+            }
+        } else {
+            // Transformation profile constraints
+            if let (Some(input), None) = (&self.example_input, &self.example_output) {
+                if !input.trim().is_empty() {
+                    return Err(
+                        "Transformation profile with example_input must also have example_output"
+                            .to_string(),
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Collection of profiles with default selection
@@ -345,17 +395,26 @@ impl Default for ProfileEngine {
     }
 }
 
+/// Helper constructors for profiles
 impl Profile {
-    /// Check if this profile is the clipboard profile (direct copy without formatting)
-    pub fn is_clipboard_profile(&self) -> bool {
-        self.id == "1"
+    /// Set profile name (mutable)
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
     }
 
-    /// Check if this profile should use GPT formatting
-    pub fn should_use_gpt_formatting(&self) -> bool {
-        !self.is_clipboard_profile()
-            && self.prompt.is_some()
-            && !self.prompt.as_ref().unwrap().is_empty()
+    /// Set profile description (mutable)
+    pub fn set_description(&mut self, description: Option<String>) {
+        self.description = description;
+    }
+
+    /// Set profile visible status (mutable)
+    pub fn set_visible(&mut self, visible: Option<bool>) {
+        self.visible = visible;
+    }
+
+    /// Set profile shortcut (mutable)
+    pub fn set_shortcut(&mut self, shortcut: Option<String>) {
+        self.shortcut = shortcut;
     }
 }
 
@@ -379,7 +438,7 @@ pub fn ensure_clipboard_profile(profiles: &mut Vec<Profile>) {
             description: Some(
                 "Copy transcription directly to clipboard without formatting".to_string(),
             ),
-            prompt: None, // No prompt for clipboard profile - bypasses GPT formatting
+            prompt: None,
             example_input: None,
             example_output: None,
             active: false,       // Not active by default, but always available
@@ -397,7 +456,6 @@ pub fn ensure_clipboard_profile(profiles: &mut Vec<Profile>) {
             profile_1.name = "Clipboard".to_string();
             profile_1.description =
                 Some("Copy transcription directly to clipboard without formatting".to_string());
-            profile_1.prompt = None; // Ensure no prompt for clipboard profile
             profile_1.visible = Some(true); // Always visible
         }
     }
@@ -685,20 +743,17 @@ mod tests {
     fn test_validate_profiles_collection_within_limit() {
         let engine = ProfileEngine::new();
         let mut profile1 = create_test_profile();
-        profile1.id = "profile1".to_string();
         profile1.visible = Some(true);
 
         let mut profile2 = create_test_profile();
-        profile2.id = "profile2".to_string();
         profile2.visible = Some(true);
 
         let mut profile3 = create_test_profile();
-        profile3.id = "profile3".to_string();
         profile3.visible = Some(false);
 
         let profiles = ProfileCollection {
             profiles: vec![profile1, profile2, profile3],
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
         assert!(engine.validate_profiles_collection(&profiles).is_ok());
@@ -709,16 +764,15 @@ mod tests {
         let engine = ProfileEngine::new();
         let mut profiles_vec = Vec::new();
 
-        for i in 1..=5 {
+        for _i in 1..=5 {
             let mut profile = create_test_profile();
-            profile.id = format!("profile{}", i);
             profile.visible = Some(true);
             profiles_vec.push(profile);
         }
 
         let profiles = ProfileCollection {
             profiles: profiles_vec,
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
         assert!(engine.validate_profiles_collection(&profiles).is_ok());
@@ -729,16 +783,15 @@ mod tests {
         let engine = ProfileEngine::new();
         let mut profiles_vec = Vec::new();
 
-        for i in 1..=6 {
+        for _i in 1..=6 {
             let mut profile = create_test_profile();
-            profile.id = format!("profile{}", i);
             profile.visible = Some(true);
             profiles_vec.push(profile);
         }
 
         let profiles = ProfileCollection {
             profiles: profiles_vec,
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
         let result = engine.validate_profiles_collection(&profiles);
@@ -752,24 +805,17 @@ mod tests {
     fn test_validate_profiles_collection_null_and_false_ignored() {
         let engine = ProfileEngine::new();
         let mut profile1 = create_test_profile();
-        profile1.id = "profile1".to_string();
         profile1.visible = Some(true);
 
         let mut profile2 = create_test_profile();
-        profile2.id = "profile2".to_string();
         profile2.visible = Some(false);
 
         let mut profile3 = create_test_profile();
-        profile3.id = "profile3".to_string();
         profile3.visible = None;
 
-        let mut profile4 = create_test_profile();
-        profile4.id = "profile4".to_string();
-        // visible field is None by default
-
         let profiles = ProfileCollection {
-            profiles: vec![profile1, profile2, profile3, profile4],
-            default_profile_id: "profile1".to_string(),
+            profiles: vec![profile1, profile2, profile3],
+            default_profile_id: "test".to_string(),
         };
 
         assert!(engine.validate_profiles_collection(&profiles).is_ok());
@@ -778,7 +824,7 @@ mod tests {
     #[test]
     fn test_profile_with_shortcut() {
         let mut profile = create_test_profile();
-        profile.shortcut = Some("Ctrl+Alt+1".to_string());
+        profile.set_shortcut(Some("Ctrl+Alt+1".to_string()));
 
         assert_eq!(profile.shortcut, Some("Ctrl+Alt+1".to_string()));
     }
@@ -787,20 +833,18 @@ mod tests {
     fn test_validate_shortcut_conflicts_no_conflicts() {
         let engine = ProfileEngine::new();
         let mut profile1 = create_test_profile();
-        profile1.id = "profile1".to_string();
         profile1.shortcut = Some("Ctrl+Alt+1".to_string());
 
         let mut profile2 = create_test_profile();
-        profile2.id = "profile2".to_string();
         profile2.shortcut = Some("Ctrl+Alt+2".to_string());
 
         let profiles = ProfileCollection {
             profiles: vec![profile1, profile2],
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
         assert!(engine
-            .validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"))
+            .validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+F9"))
             .is_ok());
     }
 
@@ -808,19 +852,17 @@ mod tests {
     fn test_validate_shortcut_conflicts_profile_conflict() {
         let engine = ProfileEngine::new();
         let mut profile1 = create_test_profile();
-        profile1.id = "profile1".to_string();
         profile1.shortcut = Some("Ctrl+Alt+1".to_string());
 
         let mut profile2 = create_test_profile();
-        profile2.id = "profile2".to_string();
         profile2.shortcut = Some("Ctrl+Alt+1".to_string()); // Same shortcut
 
         let profiles = ProfileCollection {
             profiles: vec![profile1, profile2],
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
-        let result = engine.validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"));
+        let result = engine.validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+F9"));
         assert!(matches!(result, Err(ProfileError::ShortcutConflict)));
     }
 
@@ -828,15 +870,14 @@ mod tests {
     fn test_validate_shortcut_conflicts_global_conflict() {
         let engine = ProfileEngine::new();
         let mut profile1 = create_test_profile();
-        profile1.id = "profile1".to_string();
-        profile1.shortcut = Some("Ctrl+Shift+R".to_string()); // Same as global
+        profile1.shortcut = Some("Ctrl+Shift+F9".to_string()); // Same as global
 
         let profiles = ProfileCollection {
             profiles: vec![profile1],
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
-        let result = engine.validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"));
+        let result = engine.validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+F9"));
         assert!(matches!(result, Err(ProfileError::ShortcutConflict)));
     }
 
@@ -844,24 +885,21 @@ mod tests {
     fn test_validate_shortcut_conflicts_empty_shortcuts_ignored() {
         let engine = ProfileEngine::new();
         let mut profile1 = create_test_profile();
-        profile1.id = "profile1".to_string();
         profile1.shortcut = Some("".to_string()); // Empty shortcut
 
         let mut profile2 = create_test_profile();
-        profile2.id = "profile2".to_string();
         profile2.shortcut = Some("   ".to_string()); // Whitespace only
 
         let mut profile3 = create_test_profile();
-        profile3.id = "profile3".to_string();
         profile3.shortcut = None; // No shortcut
 
         let profiles = ProfileCollection {
             profiles: vec![profile1, profile2, profile3],
-            default_profile_id: "profile1".to_string(),
+            default_profile_id: "test".to_string(),
         };
 
         assert!(engine
-            .validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+R"))
+            .validate_shortcut_conflicts(&profiles, Some("Ctrl+Shift+F9"))
             .is_ok());
     }
 }

@@ -1,0 +1,70 @@
+{
+  "profiles": [
+    {
+      "id": "1",
+      "name": "Clipboard",
+      "description": "Copy transcription directly to clipboard without formatting",
+      "prompt": null,
+      "example_input": null,
+      "example_output": null,
+      "active": false,
+      "visible": true,
+      "shortcut": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": "concise",
+      "name": "Concise Messages",
+      "description": "Make messages more concise and avoid repetitions",
+      "prompt": "Make this text more concise and remove unnecessary repetitions while preserving the core meaning",
+      "example_input": "I think that maybe we should probably consider the possibility of potentially implementing this feature",
+      "example_output": "We should implement this feature",
+      "active": true,
+      "visible": true,
+      "shortcut": "Ctrl+Alt+C",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": "email-formal",
+      "name": "Formal Email",
+      "description": "Convert casual text to formal email format",
+      "prompt": "Convert this text into a formal, professional email format with proper greetings and structure",
+      "example_input": "hey can you send me the report asap",
+      "example_output": "Dear colleague,\n\nI hope this message finds you well. Could you please send me the report at your earliest convenience?\n\nThank you for your assistance.\n\nBest regards",
+      "active": false,
+      "visible": true,
+      "shortcut": "Ctrl+Alt+E",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": "meeting-notes",
+      "name": "Meeting Notes",
+      "description": "Format transcription as structured meeting notes",
+      "prompt": "Format this transcription as structured meeting notes with bullet points, action items, and clear sections",
+      "example_input": "We discussed the project timeline and John said he needs two more weeks and Sarah mentioned the budget concerns",
+      "example_output": "# Meeting Notes\n\n## Discussion Points:\n- Project timeline review\n- Budget concerns raised\n\n## Action Items:\n- John: Complete project work (Due: +2 weeks)\n- Sarah: Address budget concerns\n\n## Attendees:\n- John\n- Sarah",
+      "active": false,
+      "visible": true,
+      "shortcut": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": "code-comments",
+      "name": "Code Comments",
+      "description": "Convert technical explanations to code comments",
+      "prompt": "Convert this technical explanation into proper code comments with clear descriptions",
+      "example_input": "this function takes a user id and returns their profile data from the database",
+      "example_output": "/**\n * Retrieves user profile data from the database\n * @param {string} userId - The unique identifier for the user\n * @returns {Object} User profile data object\n */",
+      "active": false,
+      "visible": false,
+      "shortcut": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "default_profile_id": "concise"
+}

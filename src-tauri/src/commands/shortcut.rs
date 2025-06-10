@@ -41,7 +41,7 @@ fn load_global_shortcut_from_settings() -> String {
     }
 
     // Default shortcut
-    "CmdOrCtrl+Shift+R".to_string()
+    "CmdOrCtrl+Shift+F9".to_string()
 }
 
 /// Initialize the shortcut manager
@@ -416,23 +416,11 @@ pub async fn check_shortcut_available(
 
 /// Helper function to load profiles.json content
 fn load_profiles_json() -> Result<String, String> {
-    let profiles_paths = vec!["profiles.json", "../profiles.json", "../../profiles.json"];
+    use crate::utils::find_config_file_path;
 
-    for path in &profiles_paths {
-        if std::path::Path::new(path).exists() {
-            return std::fs::read_to_string(path)
-                .map_err(|e| format!("Failed to read profiles.json: {}", e));
-        }
-    }
+    let profiles_path = find_config_file_path("profiles.json")
+        .ok_or_else(|| "Could not determine profiles.json path".to_string())?;
 
-    // Try current directory approach
-    if let Ok(current_dir) = std::env::current_dir() {
-        let profiles_in_current = current_dir.join("profiles.json");
-        if profiles_in_current.exists() {
-            return std::fs::read_to_string(&profiles_in_current)
-                .map_err(|e| format!("Failed to read profiles.json: {}", e));
-        }
-    }
-
-    Err("profiles.json not found".to_string())
+    std::fs::read_to_string(&profiles_path)
+        .map_err(|e| format!("Failed to read {}: {}", profiles_path.display(), e))
 }

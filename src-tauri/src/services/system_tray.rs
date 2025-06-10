@@ -79,7 +79,7 @@ impl Default for SystemTrayConfig {
     fn default() -> Self {
         Self {
             show_startup_notification: true,
-            global_shortcut: "CmdOrCtrl+Shift+R".to_string(),
+            global_shortcut: "CmdOrCtrl+Shift+F9".to_string(),
             persist_window_position: true,
             is_first_launch: false,
         }

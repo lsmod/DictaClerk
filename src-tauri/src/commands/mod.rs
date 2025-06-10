@@ -129,7 +129,7 @@ pub async fn stop_recording_and_process_to_clipboard(
                 let engine = ProfileEngine::new();
                 match engine.find_profile_by_id(&profile_collection, profile_id) {
                     Ok(profile) => {
-                        let prompt = profile.prompt.clone();
+                        let prompt = profile.prompt.as_ref().map(|s| s.to_string());
                         eprintln!("✅ Found profile: {} (ID: {})", profile.name, profile.id);
                         (Some(profile.clone()), prompt)
                     }
@@ -187,7 +187,7 @@ pub async fn stop_recording_and_process_to_clipboard(
             // Profile 1 = clipboard profile - no GPT-4 formatting
             eprintln!("ℹ️  Using clipboard profile (ID: 1) - skipping GPT-4 formatting");
             transcript.text
-        } else if !profile.prompt.as_ref().unwrap_or(&String::new()).is_empty() {
+        } else if profile.prompt.is_some() && !profile.prompt.as_ref().unwrap().is_empty() {
             // Use GPT-4 formatting
             eprintln!(
                 "🧠 Attempting GPT-4 formatting with profile: {}",

@@ -41,3 +41,6 @@ src-tauri/target/
 
 # Settings files with sensitive information
 settings.json
+profiles.json
+
+# Note: .example files (settings.json.example, profiles.json.example) are kept in git for reference

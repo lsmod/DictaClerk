@@ -19,7 +19,7 @@ pub async fn init_system_tray(
 ) -> Result<String, String> {
     let config = SystemTrayConfig {
         show_startup_notification: show_startup_notification.unwrap_or(true),
-        global_shortcut: global_shortcut.unwrap_or_else(|| "CmdOrCtrl+Shift+R".to_string()),
+        global_shortcut: global_shortcut.unwrap_or_else(|| "CmdOrCtrl+Shift+F9".to_string()),
         persist_window_position: true,
         is_first_launch: is_first_launch.unwrap_or(false),
     };

@@ -34,6 +34,8 @@ tokio = { version = "1.32", features = ["rt-multi-thread", "sync", "fs", "time",
 tempfile = "3.8"
 async-trait = "0.1"
 thiserror = "1.0"
+# OS directories for configuration files
+dirs = "5.0"
 # Audio encoding dependencies
 vorbis_rs = "0.5.5"
 ogg = "0.9"

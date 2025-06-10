@@ -23,7 +23,7 @@ export const useSystemTray = (): SystemTrayHook => {
     try {
       await invoke('init_system_tray', {
         showStartupNotification: config.showStartupNotification ?? true,
-        globalShortcut: config.globalShortcut ?? 'CmdOrCtrl+Shift+R',
+        globalShortcut: config.globalShortcut ?? 'CmdOrCtrl+Shift+F9',
         isFirstLaunch: config.isFirstLaunch ?? false,
       })
       console.log('System tray initialized successfully')

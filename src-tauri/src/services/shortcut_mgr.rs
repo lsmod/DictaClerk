@@ -53,7 +53,7 @@ pub struct ShortcutMgrConfig {
 impl Default for ShortcutMgrConfig {
     fn default() -> Self {
         Self {
-            global_shortcut: "CmdOrCtrl+Shift+R".to_string(),
+            global_shortcut: "CmdOrCtrl+Shift+F9".to_string(),
             show_error_toasts: true,
         }
     }
@@ -345,19 +345,24 @@ impl ShortcutMgr {
         &self,
         profiles: &crate::services::ProfileCollection,
     ) -> ShortcutResult<()> {
-        let mut errors = Vec::new();
+        let mut errors: Vec<String> = Vec::new();
 
         for profile in &profiles.profiles {
-            if let Some(ref shortcut) = profile.shortcut {
+            if let Some(shortcut) = &profile.shortcut {
                 if !shortcut.trim().is_empty() {
-                    if let Err(e) = self
+                    match self
                         .register_profile_shortcut(profile.id.clone(), shortcut.clone())
                         .await
                     {
-                        errors.push(format!(
-                            "Failed to register shortcut '{}' for profile '{}': {}",
-                            shortcut, profile.id, e
-                        ));
+                        Ok(_) => eprintln!("✅ Registered profile shortcut: {}", shortcut),
+                        Err(e) => {
+                            let error_msg = format!(
+                                "Failed to register profile shortcut: {} for profile {}: {}",
+                                shortcut, profile.id, e
+                            );
+                            eprintln!("⚠️ {}", error_msg);
+                            errors.push(error_msg);
+                        }
                     }
                 }
             }

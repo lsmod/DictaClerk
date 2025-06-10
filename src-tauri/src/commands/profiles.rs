@@ -1,7 +1,10 @@
 use std::sync::Mutex;
 use tauri::{Emitter, State};
 
-use crate::services::profile_engine::{ensure_clipboard_profile, ProfileCollection, ProfileEngine};
+use crate::services::profile_engine::{
+    ensure_clipboard_profile, ProfileBehavior, ProfileCollection, ProfileEngine,
+};
+use crate::utils::find_config_file_path;
 
 /// State to hold the active profile ID
 #[derive(Default)]
@@ -16,41 +19,13 @@ pub type ProfileAppState = Mutex<ProfileState>;
 pub async fn load_profiles() -> Result<ProfileCollection, String> {
     let engine = ProfileEngine::new();
 
-    // Try multiple possible paths for profiles.json
-    let possible_paths = vec!["profiles.json", "../profiles.json", "../../profiles.json"];
+    // Use the new unified config file search logic
+    let profiles_path = find_config_file_path("profiles.json")
+        .ok_or_else(|| "Could not determine profiles.json path".to_string())?;
 
-    let mut profiles_json = None;
-    let mut last_error = String::new();
-
-    // First try the possible relative paths
-    for path in possible_paths {
-        match tokio::fs::read_to_string(path).await {
-            Ok(content) => {
-                profiles_json = Some(content);
-                break;
-            }
-            Err(e) => {
-                last_error = format!("Failed to read {}: {}", path, e);
-                continue;
-            }
-        }
-    }
-
-    // If not found, try from current_dir parent
-    if profiles_json.is_none() {
-        if let Ok(current_dir) = std::env::current_dir() {
-            if let Some(parent) = current_dir.parent() {
-                let profiles_path = parent.join("profiles.json");
-                match tokio::fs::read_to_string(&profiles_path).await {
-                    Ok(content) => profiles_json = Some(content),
-                    Err(e) => last_error = format!("Failed to read {:?}: {}", profiles_path, e),
-                }
-            }
-        }
-    }
-
-    let profiles_content = profiles_json
-        .ok_or_else(|| format!("Could not find profiles.json. Last error: {}", last_error))?;
+    let profiles_content = tokio::fs::read_to_string(&profiles_path)
+        .await
+        .map_err(|e| format!("Failed to read {}: {}", profiles_path.display(), e))?;
 
     let mut profile_collection = engine
         .load_profiles_from_json(&profiles_content)
@@ -103,41 +78,13 @@ pub async fn get_active_profile(
 pub async fn apply_profile_to_text(profile_id: String, text: String) -> Result<String, String> {
     let engine = ProfileEngine::new();
 
-    // Try multiple possible paths for profiles.json (same as load_profiles)
-    let possible_paths = vec!["profiles.json", "../profiles.json", "../../profiles.json"];
+    // Use the new unified config file search logic
+    let profiles_path = find_config_file_path("profiles.json")
+        .ok_or_else(|| "Could not determine profiles.json path".to_string())?;
 
-    let mut profiles_json = None;
-    let mut last_error = String::new();
-
-    // First try the possible relative paths
-    for path in possible_paths {
-        match tokio::fs::read_to_string(path).await {
-            Ok(content) => {
-                profiles_json = Some(content);
-                break;
-            }
-            Err(e) => {
-                last_error = format!("Failed to read {}: {}", path, e);
-                continue;
-            }
-        }
-    }
-
-    // If not found, try from current_dir parent
-    if profiles_json.is_none() {
-        if let Ok(current_dir) = std::env::current_dir() {
-            if let Some(parent) = current_dir.parent() {
-                let profiles_path = parent.join("profiles.json");
-                match tokio::fs::read_to_string(&profiles_path).await {
-                    Ok(content) => profiles_json = Some(content),
-                    Err(e) => last_error = format!("Failed to read {:?}: {}", profiles_path, e),
-                }
-            }
-        }
-    }
-
-    let profiles_content = profiles_json
-        .ok_or_else(|| format!("Could not find profiles.json. Last error: {}", last_error))?;
+    let profiles_content = tokio::fs::read_to_string(&profiles_path)
+        .await
+        .map_err(|e| format!("Failed to read {}: {}", profiles_path.display(), e))?;
 
     let mut profile_collection = engine
         .load_profiles_from_json(&profiles_content)
