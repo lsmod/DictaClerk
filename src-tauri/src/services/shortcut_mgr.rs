@@ -116,7 +116,7 @@ impl ShortcutMgr {
             Err(e) => {
                 let error_msg = format!("Failed to register shortcut '{}': {}", shortcut_str, e);
 
-                // Show error toast if enabled
+                // Show error toast if enabled (UI only, not stateful)
                 if self.config.show_error_toasts {
                     if let Err(emit_err) = self.app_handle.emit("shortcut_error", error_msg.clone())
                     {
@@ -275,7 +275,7 @@ impl ShortcutMgr {
                     shortcut_str, profile_id, e
                 );
 
-                // Show error toast if enabled
+                // Show error toast if enabled (UI only, not stateful)
                 if self.config.show_error_toasts {
                     if let Err(emit_err) = self.app_handle.emit("shortcut_error", error_msg.clone())
                     {

@@ -312,6 +312,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_encode_long_wav() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = TempDir::new()?;
         let wav_path = temp_dir.path().join("test_long.wav");

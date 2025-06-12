@@ -272,6 +272,7 @@ impl SystemTrayService {
 
     /// Show startup notification
     async fn show_startup_notification(&self) -> SystemTrayResult<()> {
+        // Emit system notification for UI only (not stateful)
         if let Err(e) = self.app_handle.emit(
             "system_notification",
             format!(

@@ -154,3 +154,4 @@ pub async fn stop_recording_via_state_machine(
         Err("Audio capture not initialized".to_string())
     }
 }
+ 

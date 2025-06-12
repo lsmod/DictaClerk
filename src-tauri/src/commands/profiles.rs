@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, State};
+use tauri::{Manager, State};
 
 use crate::services::profile_engine::{
     ensure_clipboard_profile, ProfileBehavior, ProfileCollection, ProfileEngine,
@@ -65,16 +65,16 @@ pub async fn select_profile(
     }
 
     // Note: Frontend should listen to app-state-changed events from state machine
-    // instead of this direct emission, but keeping for backward compatibility
-    app_handle
-        .emit_to(
-            "main",
-            "selectProfile",
-            serde_json::json!({
-                "profile_id": profile_id
-            }),
-        )
-        .map_err(|e| format!("Failed to emit selectProfile event: {}", e))?;
+    // instead of this direct emission. The following emit is deprecated and will be removed in a future release.
+    // app_handle
+    //     .emit_to(
+    //         "main",
+    //         "selectProfile",
+    //         serde_json::json!({
+    //             "profile_id": profile_id
+    //         }),
+    //     )
+    //     .map_err(|e| format!("Failed to emit selectProfile event: {}", e))?;
 
     Ok(format!("Profile '{}' selected", profile_id))
 }
