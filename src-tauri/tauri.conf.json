@@ -15,11 +15,11 @@
       {
         "label": "main",
         "title": "DictaClerk",
-        "width": 300,
-        "height": 200,
+        "width": 500,
+        "height": 300,
         "decorations": false,
         "alwaysOnTop": true,
-        "resizable": false
+        "resizable": true
       }
     ],
     "security": {
