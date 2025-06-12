@@ -1,8 +1,10 @@
 //! System tray related commands for managing tray functionality
 
+use crate::commands::state_machine::process_event;
 use crate::services::{SystemTrayConfig, SystemTrayService};
+use crate::state::{AppEvent, AppStateMachineState};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
 use tokio::sync::Mutex;
 
 /// Global state for the system tray service
@@ -41,7 +43,15 @@ pub async fn init_system_tray(
 
 /// Show the main window
 #[tauri::command]
-pub async fn show_main_window(state: State<'_, SystemTrayState>) -> Result<String, String> {
+pub async fn show_main_window(
+    state: State<'_, SystemTrayState>,
+    state_machine_state: State<'_, AppStateMachineState>,
+) -> Result<String, String> {
+    // First emit event to state machine
+    if let Err(e) = process_event(AppEvent::ShowMainWindow, &state_machine_state).await {
+        eprintln!("Warning: Failed to process ShowMainWindow event: {}", e);
+    }
+
     let state_guard = state.lock().await;
 
     if let Some(ref service) = *state_guard {
@@ -58,7 +68,15 @@ pub async fn show_main_window(state: State<'_, SystemTrayState>) -> Result<Strin
 
 /// Hide the main window
 #[tauri::command]
-pub async fn hide_main_window(state: State<'_, SystemTrayState>) -> Result<String, String> {
+pub async fn hide_main_window(
+    state: State<'_, SystemTrayState>,
+    state_machine_state: State<'_, AppStateMachineState>,
+) -> Result<String, String> {
+    // First emit event to state machine
+    if let Err(e) = process_event(AppEvent::HideMainWindow, &state_machine_state).await {
+        eprintln!("Warning: Failed to process HideMainWindow event: {}", e);
+    }
+
     let state_guard = state.lock().await;
 
     if let Some(ref service) = *state_guard {
@@ -178,9 +196,17 @@ pub async fn update_tray_global_shortcut(
     }
 }
 
-/// Open settings window
+/// Open settings window with state machine integration
 #[tauri::command]
-pub async fn open_settings_window(app_handle: AppHandle) -> Result<String, String> {
+pub async fn open_settings_window(
+    app_handle: AppHandle,
+    state_machine_state: State<'_, AppStateMachineState>,
+) -> Result<String, String> {
+    // First emit event to state machine
+    if let Err(e) = process_event(AppEvent::OpenSettingsWindow, &state_machine_state).await {
+        eprintln!("Warning: Failed to process OpenSettingsWindow event: {}", e);
+    }
+
     // Check if settings window already exists
     if let Some(_window) = app_handle.get_webview_window("settings") {
         // Settings window exists, just focus it
@@ -191,7 +217,7 @@ pub async fn open_settings_window(app_handle: AppHandle) -> Result<String, Strin
     }
 
     // Create new settings window
-    let settings_window = WebviewWindowBuilder::new(
+    let _settings_window = WebviewWindowBuilder::new(
         &app_handle,
         "settings",
         tauri::WebviewUrl::App("index.html".into()),
@@ -205,16 +231,25 @@ pub async fn open_settings_window(app_handle: AppHandle) -> Result<String, Strin
     .map_err(|e| format!("Failed to create settings window: {}", e))?;
 
     // Emit event to the settings window to show settings content
-    settings_window
-        .emit("show-settings", ())
-        .map_err(|e| format!("Failed to emit show-settings event: {}", e))?;
-
+    // Note: The frontend should listen to app-state-changed events from the state machine
+    // to determine what content to show in the settings window
     Ok("Settings window opened".to_string())
 }
 
-/// Close settings window
+/// Close settings window with state machine integration
 #[tauri::command]
-pub async fn close_settings_window(app_handle: AppHandle) -> Result<String, String> {
+pub async fn close_settings_window(
+    app_handle: AppHandle,
+    state_machine_state: State<'_, AppStateMachineState>,
+) -> Result<String, String> {
+    // First emit event to state machine
+    if let Err(e) = process_event(AppEvent::CloseSettingsWindow, &state_machine_state).await {
+        eprintln!(
+            "Warning: Failed to process CloseSettingsWindow event: {}",
+            e
+        );
+    }
+
     if let Some(window) = app_handle.get_webview_window("settings") {
         window
             .close()

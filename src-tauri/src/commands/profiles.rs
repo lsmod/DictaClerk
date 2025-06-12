@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
 use crate::services::profile_engine::{
     ensure_clipboard_profile, ProfileBehavior, ProfileCollection, ProfileEngine,
@@ -44,13 +44,28 @@ pub async fn select_profile(
     state: State<'_, ProfileAppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
+    // First process through state machine if available
+    if let Some(state_machine) = app_handle.try_state::<crate::state::AppStateMachineState>() {
+        if let Err(e) = crate::commands::state_machine::process_event(
+            crate::state::AppEvent::SelectProfile {
+                profile_id: profile_id.clone(),
+            },
+            &state_machine,
+        )
+        .await
+        {
+            eprintln!("Warning: Failed to process SelectProfile event: {}", e);
+        }
+    }
+
     // Update the active profile in state
     {
         let mut profile_state = state.lock().unwrap();
         profile_state.active_profile_id = Some(profile_id.clone());
     }
 
-    // Emit an event to notify the frontend
+    // Note: Frontend should listen to app-state-changed events from state machine
+    // instead of this direct emission, but keeping for backward compatibility
     app_handle
         .emit_to(
             "main",

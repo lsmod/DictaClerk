@@ -104,6 +104,10 @@ pub enum AppEvent {
     StopRecording,
     /// Cancel recording without processing
     CancelRecording,
+    /// Toggle recording state (start if idle, stop if recording)
+    ToggleRecording,
+    /// Start recording from system tray interaction
+    StartRecordingFromTray,
 
     // === WINDOW MANAGEMENT EVENTS ===
     /// Show the main window
@@ -114,6 +118,10 @@ pub enum AppEvent {
     OpenSettingsWindow,
     /// Close settings window
     CloseSettingsWindow,
+    /// Open profile editor window
+    OpenProfileEditorWindow { profile_id: Option<String> },
+    /// Close profile editor window
+    CloseProfileEditorWindow,
 
     // === PROFILE MANAGEMENT EVENTS ===
     /// Start creating a new profile
@@ -324,6 +332,22 @@ impl AppStateMachine {
                 AppState::Idle {
                     main_window_visible: _,
                 },
+                AppEvent::ToggleRecording,
+            ) => Ok(AppState::Recording {
+                started_at: current_time,
+            }),
+            (
+                AppState::Idle {
+                    main_window_visible: _,
+                },
+                AppEvent::StartRecordingFromTray,
+            ) => Ok(AppState::Recording {
+                started_at: current_time,
+            }),
+            (
+                AppState::Idle {
+                    main_window_visible: _,
+                },
                 AppEvent::ShowMainWindow,
             ) => Ok(AppState::Idle {
                 main_window_visible: true,
@@ -349,6 +373,13 @@ impl AppStateMachine {
             // === FROM RECORDING STATE ===
             (AppState::Recording { started_at: _ }, AppEvent::StopRecording) => {
                 // Note: wav_path would be provided by the audio system
+                Ok(AppState::ProcessingTranscription {
+                    wav_path: PathBuf::from("/tmp/recording.wav"), // Placeholder
+                    started_at: current_time,
+                })
+            }
+            (AppState::Recording { started_at: _ }, AppEvent::ToggleRecording) => {
+                // Toggle from recording -> stop recording
                 Ok(AppState::ProcessingTranscription {
                     wav_path: PathBuf::from("/tmp/recording.wav"), // Placeholder
                     started_at: current_time,
@@ -485,6 +516,18 @@ impl AppStateMachine {
                     settings_context: Box::new(self.current_state.clone()),
                 })
             }
+            (
+                AppState::SettingsWindowOpen { .. },
+                AppEvent::OpenProfileEditorWindow { profile_id },
+            ) => match profile_id {
+                Some(id) => Ok(AppState::EditProfileEditorOpen {
+                    profile_id: id.clone(),
+                    settings_context: Box::new(self.current_state.clone()),
+                }),
+                None => Ok(AppState::NewProfileEditorOpen {
+                    settings_context: Box::new(self.current_state.clone()),
+                }),
+            },
 
             // === FROM PROFILE EDITOR STATES ===
             (AppState::NewProfileEditorOpen { settings_context }, AppEvent::SaveProfile { .. }) => {
@@ -493,6 +536,10 @@ impl AppStateMachine {
             (AppState::NewProfileEditorOpen { settings_context }, AppEvent::CancelProfileEdit) => {
                 Ok(*settings_context.clone())
             }
+            (
+                AppState::NewProfileEditorOpen { settings_context },
+                AppEvent::CloseProfileEditorWindow,
+            ) => Ok(*settings_context.clone()),
             (
                 AppState::EditProfileEditorOpen {
                     settings_context, ..
@@ -504,6 +551,12 @@ impl AppStateMachine {
                     settings_context, ..
                 },
                 AppEvent::CancelProfileEdit,
+            ) => Ok(*settings_context.clone()),
+            (
+                AppState::EditProfileEditorOpen {
+                    settings_context, ..
+                },
+                AppEvent::CloseProfileEditorWindow,
             ) => Ok(*settings_context.clone()),
             (
                 AppState::EditProfileEditorOpen {
@@ -616,6 +669,22 @@ impl AppStateMachine {
                 AppState::Idle {
                     main_window_visible: _,
                 },
+                AppEvent::ToggleRecording,
+            ) => Ok(AppState::Recording {
+                started_at: current_time,
+            }),
+            (
+                AppState::Idle {
+                    main_window_visible: _,
+                },
+                AppEvent::StartRecordingFromTray,
+            ) => Ok(AppState::Recording {
+                started_at: current_time,
+            }),
+            (
+                AppState::Idle {
+                    main_window_visible: _,
+                },
                 AppEvent::ShowMainWindow,
             ) => Ok(AppState::Idle {
                 main_window_visible: true,
@@ -641,6 +710,13 @@ impl AppStateMachine {
             // === FROM RECORDING STATE ===
             (AppState::Recording { started_at: _ }, AppEvent::StopRecording) => {
                 // Note: wav_path would be provided by the audio system
+                Ok(AppState::ProcessingTranscription {
+                    wav_path: PathBuf::from("/tmp/recording.wav"), // Placeholder
+                    started_at: current_time,
+                })
+            }
+            (AppState::Recording { started_at: _ }, AppEvent::ToggleRecording) => {
+                // Toggle from recording -> stop recording
                 Ok(AppState::ProcessingTranscription {
                     wav_path: PathBuf::from("/tmp/recording.wav"), // Placeholder
                     started_at: current_time,
@@ -777,6 +853,18 @@ impl AppStateMachine {
                     settings_context: Box::new(current_state.clone()),
                 })
             }
+            (
+                AppState::SettingsWindowOpen { .. },
+                AppEvent::OpenProfileEditorWindow { profile_id },
+            ) => match profile_id {
+                Some(id) => Ok(AppState::EditProfileEditorOpen {
+                    profile_id: id.clone(),
+                    settings_context: Box::new(current_state.clone()),
+                }),
+                None => Ok(AppState::NewProfileEditorOpen {
+                    settings_context: Box::new(current_state.clone()),
+                }),
+            },
 
             // === FROM PROFILE EDITOR STATES ===
             (AppState::NewProfileEditorOpen { settings_context }, AppEvent::SaveProfile { .. }) => {
@@ -785,6 +873,10 @@ impl AppStateMachine {
             (AppState::NewProfileEditorOpen { settings_context }, AppEvent::CancelProfileEdit) => {
                 Ok(*settings_context.clone())
             }
+            (
+                AppState::NewProfileEditorOpen { settings_context },
+                AppEvent::CloseProfileEditorWindow,
+            ) => Ok(*settings_context.clone()),
             (
                 AppState::EditProfileEditorOpen {
                     settings_context, ..
@@ -796,6 +888,12 @@ impl AppStateMachine {
                     settings_context, ..
                 },
                 AppEvent::CancelProfileEdit,
+            ) => Ok(*settings_context.clone()),
+            (
+                AppState::EditProfileEditorOpen {
+                    settings_context, ..
+                },
+                AppEvent::CloseProfileEditorWindow,
             ) => Ok(*settings_context.clone()),
             (
                 AppState::EditProfileEditorOpen {

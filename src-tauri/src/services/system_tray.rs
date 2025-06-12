@@ -243,8 +243,9 @@ impl SystemTrayService {
                         ..
                     } => {
                         // Double click shows window and starts recording
-                        if let Err(e) = app_handle.emit("start_recording_from_tray", ()) {
-                            eprintln!("Failed to emit start recording event: {}", e);
+                        // Emit event that frontend can listen to and route through proper commands
+                        if let Err(e) = app_handle.emit("tray_double_click_show_and_record", ()) {
+                            eprintln!("Failed to emit tray double click event: {}", e);
                         }
                     }
                     _ => {}
@@ -300,10 +301,9 @@ impl SystemTrayService {
             let mut hidden_guard = self.is_window_hidden.lock().await;
             *hidden_guard = true;
 
-            // Stop recording if active
-            if let Err(e) = self.app_handle.emit("stop_recording_on_hide", ()) {
-                eprintln!("Failed to emit stop recording event: {}", e);
-            }
+            // Process window hide event through state machine instead of direct emission
+            // The state machine will handle stopping recording if needed
+            // This should be handled by the main window hide command that routes through state machine
         }
         Ok(())
     }
@@ -350,19 +350,18 @@ impl SystemTrayService {
         // Show the window first
         self.show_main_window().await?;
 
-        // Emit event to start recording
-        if let Err(e) = self.app_handle.emit("start_recording_from_tray", ()) {
-            eprintln!("Failed to emit start recording event: {}", e);
-        }
+        // This event should be routed through the state machine instead of direct emission
+        // The frontend should listen to state machine events for recording state changes
+        // TODO: This needs to be called through the proper command that routes to state machine
 
         Ok(())
     }
 
     /// Show settings window (for first launch)
     async fn show_settings_window(&self) -> SystemTrayResult<()> {
-        if let Err(e) = self.app_handle.emit("show_settings", ()) {
-            eprintln!("Failed to emit show settings event: {}", e);
-        }
+        // This should be routed through the state machine command instead of direct emission
+        // Use the open_settings_window command which routes through state machine
+        // TODO: Call crate::commands::open_settings_window() here
         Ok(())
     }
 

@@ -5,6 +5,7 @@ pub mod gpt;
 pub mod profiles;
 pub mod settings;
 pub mod shortcut;
+pub mod state_machine;
 pub mod system_tray;
 pub mod whisper;
 
@@ -32,6 +33,11 @@ pub use shortcut::{
     toggle_record, toggle_record_with_tray, unregister_all_profile_shortcuts,
     unregister_global_shortcut, unregister_profile_shortcut, update_global_shortcut,
     ShortcutMgrState,
+};
+pub use state_machine::{
+    get_current_state, has_modal_window_open, init_state_machine, is_app_processing,
+    is_app_recording, should_main_window_be_visible, start_recording_via_state_machine,
+    stop_recording_via_state_machine,
 };
 pub use system_tray::{
     close_settings_window, handle_window_close, hide_main_window, init_system_tray,

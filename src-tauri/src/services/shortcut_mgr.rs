@@ -93,23 +93,13 @@ impl ShortcutMgr {
             .parse()
             .map_err(|e| ShortcutError::ParseError(format!("{}", e)))?;
 
-        // Clone app_handle for the closure
-        let app_handle = self.app_handle.clone();
-        let shortcut_str_clone = shortcut_str.clone();
-
         // Attempt to register the shortcut
         let registration_result = self.app_handle.global_shortcut().on_shortcut(
             shortcut,
-            move |_app_handle, _shortcut, _event| {
-                // Emit toggleRecordWithTray event when shortcut is pressed for tray integration
-                if let Err(e) = app_handle.emit(
-                    "toggleRecordWithTray",
-                    ShortcutEvent {
-                        shortcut: shortcut_str_clone.clone(),
-                        action: "toggle".to_string(),
-                    },
-                ) {
-                    eprintln!("Failed to emit toggleRecordWithTray event: {}", e);
+            move |app_handle, _shortcut, _event| {
+                // Emit a custom event that the main app will listen to and route through state machine
+                if let Err(e) = app_handle.emit("global_shortcut_toggle_record", ()) {
+                    eprintln!("Failed to emit global shortcut toggle record event: {}", e);
                 }
             },
         );
@@ -243,8 +233,7 @@ impl ShortcutMgr {
             .parse()
             .map_err(|e| ShortcutError::ParseError(format!("{}", e)))?;
 
-        // Clone app_handle and profile_id for the closure
-        let app_handle = self.app_handle.clone();
+        // Clone profile_id for the closure
         let profile_id_clone = profile_id.clone();
         let shortcut_str_clone = shortcut_str.clone();
 
@@ -254,17 +243,16 @@ impl ShortcutMgr {
         // Attempt to register the shortcut
         let registration_result = self.app_handle.global_shortcut().on_shortcut(
             shortcut,
-            move |_app_handle, _shortcut, _event| {
-                // Emit selectProfile event when shortcut is pressed
+            move |app_handle, _shortcut, _event| {
+                // Emit a custom event that the main app will listen to and route through state machine
                 if let Err(e) = app_handle.emit(
-                    "selectProfile",
+                    "global_shortcut_select_profile",
                     serde_json::json!({
                         "profile_id": profile_id_clone.clone(),
                         "shortcut": shortcut_str_clone.clone(),
-                        "action": "select"
                     }),
                 ) {
-                    eprintln!("Failed to emit selectProfile event: {}", e);
+                    eprintln!("Failed to emit profile selection event: {}", e);
                 }
             },
         );
