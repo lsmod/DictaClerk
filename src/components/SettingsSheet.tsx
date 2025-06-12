@@ -20,7 +20,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProfileEditorWindow from '../windows/ProfileEditorWindow'
 import { useSettingsSheetViewModel } from './settingsSheet.viewModel'
-import { Profile } from '@/contexts/ProfileContext'
+import { Profile } from '@/store/slices/appSlice'
 
 interface SettingsSheetProps {
   onClose: () => void

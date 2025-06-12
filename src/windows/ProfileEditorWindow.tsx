@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { TooltipProvider } from '../components/ui/tooltip'
-import { ProfileProvider } from '../contexts/ProfileContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { Profile } from '@/contexts/ProfileContext'
+import { Profile } from '@/store/slices/appSlice'
 import { useProfileEditorViewModel } from './profileEditorWindow.viewModel'
 import { useProfileEditorWindowViewModel } from './profileEditorWindow.viewModel'
 
@@ -46,226 +45,204 @@ export default function ProfileEditorWindow({
   }, [])
 
   return (
-    <ProfileProvider>
-      <TooltipProvider>
-        <div className="profile-editor-window">
-          <div className="profile-editor">
-            <div className="editor-header">
-              <Button
-                className="back-button"
-                onClick={actions.navigateBack}
-                aria-label="Go back to profiles list"
-              >
-                <ArrowLeft size={16} aria-hidden="true" />
-              </Button>
-              <h3>
-                {state.isNewProfile ? 'Create New Profile' : 'Edit Profile'}
-              </h3>
-            </div>
-
-            <form
-              className="editor-form"
-              onSubmit={(e) => {
-                e.preventDefault()
-                actions.saveProfile()
-              }}
-              noValidate
-              aria-label={`${
-                state.isNewProfile ? 'Create new' : 'Edit'
-              } profile form`}
+    <TooltipProvider>
+      <div className="profile-editor-window">
+        <div className="profile-editor">
+          <div className="editor-header">
+            <Button
+              className="back-button"
+              onClick={actions.navigateBack}
+              aria-label="Go back to profiles list"
             >
+              <ArrowLeft size={16} aria-hidden="true" />
+            </Button>
+            <h3>
+              {state.isNewProfile ? 'Create New Profile' : 'Edit Profile'}
+            </h3>
+          </div>
+
+          <div className="editor-content">
+            <div className="profile-form">
               <div className="form-group">
-                <label htmlFor="profile-name">Name *</label>
+                <label htmlFor="profile-name" className="form-label">
+                  Profile Name *
+                </label>
                 <Input
-                  ref={nameInputRef}
                   id="profile-name"
-                  value={state.formData.name || ''}
-                  onChange={(e) => actions.updateName(e.target.value)}
-                  className={state.errors.name ? 'error' : ''}
-                  aria-describedby={
-                    state.errors.name ? 'name-error' : 'name-help'
+                  ref={nameInputRef}
+                  type="text"
+                  value={state.formData.name}
+                  onChange={(e) =>
+                    actions.updateFormData('name', e.target.value)
                   }
+                  placeholder="Enter profile name"
+                  aria-describedby="name-error"
                   aria-invalid={!!state.errors.name}
+                  maxLength={50}
                   required
                 />
-                {!state.errors.name && (
-                  <div id="name-help" className="sr-only">
-                    Enter a descriptive name for this profile
-                  </div>
-                )}
                 {state.errors.name && (
-                  <span
-                    id="name-error"
-                    className="error-text"
-                    role="alert"
-                    aria-live="polite"
-                  >
+                  <span id="name-error" className="form-error">
                     {state.errors.name}
                   </span>
                 )}
               </div>
 
               <div className="form-group">
-                <label htmlFor="profile-description">Description</label>
+                <label htmlFor="profile-description" className="form-label">
+                  Description
+                </label>
                 <Input
                   id="profile-description"
+                  type="text"
                   value={state.formData.description || ''}
-                  onChange={(e) => actions.updateDescription(e.target.value)}
-                  aria-describedby="description-help"
+                  onChange={(e) =>
+                    actions.updateFormData('description', e.target.value)
+                  }
+                  placeholder="Brief description of this profile"
+                  maxLength={200}
                 />
-                <div id="description-help" className="sr-only">
-                  Optional brief description of this profile's purpose
-                </div>
               </div>
 
               <div className="form-group">
-                <label htmlFor="profile-prompt">Prompt *</label>
+                <label htmlFor="profile-prompt" className="form-label">
+                  GPT Prompt
+                </label>
                 <Textarea
                   id="profile-prompt"
                   value={state.formData.prompt || ''}
-                  onChange={(e) => actions.updatePrompt(e.target.value)}
-                  className={state.errors.prompt ? 'error' : ''}
-                  rows={4}
-                  aria-describedby={
-                    state.errors.prompt ? 'prompt-error' : 'prompt-help'
+                  onChange={(e) =>
+                    actions.updateFormData('prompt', e.target.value)
                   }
-                  aria-invalid={!!state.errors.prompt}
-                  required
+                  placeholder="Instructions for GPT on how to format the transcribed text"
+                  rows={4}
+                  maxLength={1000}
                 />
-                {!state.errors.prompt && (
-                  <div id="prompt-help" className="sr-only">
-                    The main prompt that will be used for AI processing. This is
-                    the core instruction that guides how the AI will process
-                    your input.
-                  </div>
-                )}
-                {state.errors.prompt && (
-                  <span
-                    id="prompt-error"
-                    className="error-text"
-                    role="alert"
-                    aria-live="polite"
-                  >
-                    {state.errors.prompt}
-                  </span>
-                )}
               </div>
 
               <div className="form-group">
-                <label htmlFor="profile-example-input">Example Input</label>
+                <label htmlFor="profile-example-input" className="form-label">
+                  Example Input
+                </label>
                 <Textarea
                   id="profile-example-input"
                   value={state.formData.example_input || ''}
-                  onChange={(e) => actions.updateExampleInput(e.target.value)}
+                  onChange={(e) =>
+                    actions.updateFormData('example_input', e.target.value)
+                  }
+                  placeholder="Example of input text that would be transcribed"
                   rows={3}
-                  aria-describedby="example-input-help"
+                  maxLength={500}
                 />
-                <div id="example-input-help" className="sr-only">
-                  Optional example of input text for this profile. This helps
-                  demonstrate what kind of input this profile is designed to
-                  handle.
-                </div>
               </div>
 
               <div className="form-group">
-                <label htmlFor="profile-example-output">Example Output</label>
+                <label htmlFor="profile-example-output" className="form-label">
+                  Example Output
+                </label>
                 <Textarea
                   id="profile-example-output"
                   value={state.formData.example_output || ''}
-                  onChange={(e) => actions.updateExampleOutput(e.target.value)}
-                  className={state.errors.example_output ? 'error' : ''}
-                  rows={3}
-                  aria-describedby={
-                    state.errors.example_output
-                      ? 'example-output-error'
-                      : 'example-output-help'
+                  onChange={(e) =>
+                    actions.updateFormData('example_output', e.target.value)
                   }
-                  aria-invalid={!!state.errors.example_output}
+                  placeholder="Example of how the text should be formatted"
+                  rows={3}
+                  maxLength={500}
                 />
-                {!state.errors.example_output && (
-                  <div id="example-output-help" className="sr-only">
-                    Optional example of expected output for this profile. This
-                    shows what the AI should produce when processing the example
-                    input.
-                  </div>
-                )}
-                {state.errors.example_output && (
-                  <span
-                    id="example-output-error"
-                    className="error-text"
-                    role="alert"
-                    aria-live="polite"
-                  >
-                    {state.errors.example_output}
-                  </span>
-                )}
               </div>
 
               <div className="form-group">
-                <label htmlFor="profile-shortcut">Shortcut</label>
+                <label htmlFor="profile-shortcut" className="form-label">
+                  Keyboard Shortcut
+                </label>
                 <Input
                   id="profile-shortcut"
+                  type="text"
                   value={state.formData.shortcut || ''}
-                  onChange={(e) => actions.updateShortcut(e.target.value)}
-                  className="shortcut-field"
-                  aria-describedby="shortcut-help"
-                  placeholder="e.g., Ctrl+Shift+P"
+                  onChange={(e) =>
+                    actions.updateFormData('shortcut', e.target.value)
+                  }
+                  placeholder="e.g., Ctrl+Shift+1"
+                  maxLength={50}
                 />
-                <div id="shortcut-help" className="sr-only">
-                  Optional keyboard shortcut to activate this profile. Use
-                  standard modifier keys like Ctrl, Alt, Shift with other keys.
-                </div>
               </div>
 
-              <div className="form-group toggle-group">
-                <label htmlFor="profile-visible">Visible in quick access</label>
-                <Switch
-                  id="profile-visible"
-                  checked={state.formData.visible || false}
-                  onCheckedChange={actions.updateVisible}
-                  aria-describedby="visible-help"
-                />
-                <div id="visible-help" className="sr-only">
-                  When enabled, this profile appears in the quick access list.
-                  Maximum of 5 profiles can be visible at once.
+              <div className="form-group checkbox-group">
+                <div className="checkbox-item">
+                  <Switch
+                    id="profile-visible"
+                    checked={state.formData.visible || false}
+                    onCheckedChange={(checked) =>
+                      actions.updateFormData('visible', checked)
+                    }
+                    aria-describedby="visible-description"
+                  />
+                  <label htmlFor="profile-visible" className="checkbox-label">
+                    Visible in Main Window
+                  </label>
                 </div>
+                <span id="visible-description" className="checkbox-description">
+                  Show this profile as a button in the main window (max 4
+                  profiles)
+                </span>
               </div>
 
-              <div className="editor-actions">
+              <div className="form-group checkbox-group">
+                <div className="checkbox-item">
+                  <Switch
+                    id="profile-active"
+                    checked={state.formData.active || false}
+                    onCheckedChange={(checked) =>
+                      actions.updateFormData('active', checked)
+                    }
+                    aria-describedby="active-description"
+                  />
+                  <label htmlFor="profile-active" className="checkbox-label">
+                    Set as Default Profile
+                  </label>
+                </div>
+                <span id="active-description" className="checkbox-description">
+                  Use this profile by default when starting recordings
+                </span>
+              </div>
+            </div>
+
+            <div className="editor-actions">
+              {!state.isNewProfile && (
                 <Button
-                  type="submit"
+                  variant="destructive"
+                  onClick={actions.handleDelete}
+                  className="delete-button"
+                  aria-label={`Delete ${state.formData.name} profile`}
+                >
+                  Delete Profile
+                </Button>
+              )}
+
+              <div className="save-actions">
+                <Button
+                  variant="outline"
+                  onClick={actions.navigateBack}
+                  className="cancel-button"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={actions.handleSave}
+                  disabled={!actions.canSave()}
                   className="save-button"
-                  onClick={actions.saveProfile}
-                  aria-label={`${
-                    state.isNewProfile ? 'Create' : 'Save changes to'
-                  } profile ${state.formData.name || 'unnamed'}`}
+                  aria-label={
+                    state.isNewProfile ? 'Create profile' : 'Save changes'
+                  }
                 >
                   {state.isNewProfile ? 'Create Profile' : 'Save Changes'}
                 </Button>
-                {profile.id && !state.isNewProfile && (
-                  <Button
-                    type="button"
-                    className="delete-button"
-                    onClick={actions.deleteProfile}
-                    aria-label={`Delete profile ${
-                      state.formData.name || 'unnamed'
-                    }`}
-                    aria-describedby="delete-warning"
-                  >
-                    Delete Profile
-                  </Button>
-                )}
-                {profile.id && !state.isNewProfile && (
-                  <div id="delete-warning" className="sr-only">
-                    Warning: Deleting this profile is permanent and cannot be
-                    undone.
-                  </div>
-                )}
               </div>
-            </form>
+            </div>
           </div>
         </div>
-      </TooltipProvider>
-    </ProfileProvider>
+      </div>
+    </TooltipProvider>
   )
 }

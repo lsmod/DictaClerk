@@ -116,12 +116,22 @@ export const useSystemTray = (): SystemTrayHook => {
           window.dispatchEvent(new CustomEvent('tray-show-settings'))
         })
 
-        // Listen for toggle record with tray integration
-        unlistenToggleRecord = await listen('toggleRecordWithTray', () => {
-          console.log('Toggle record with tray integration triggered')
-          // Emit custom event for the app to handle
-          window.dispatchEvent(new CustomEvent('tray-toggle-record'))
-        })
+        // Listen for global shortcut toggle record with tray integration
+        unlistenToggleRecord = await listen(
+          'toggleRecordWithTray',
+          async () => {
+            console.log(
+              'Global shortcut pressed - calling toggle_record_with_tray command'
+            )
+            try {
+              // Call the backend command directly that handles the logic
+              const result = await invoke('toggle_record_with_tray')
+              console.log('Toggle record with tray result:', result)
+            } catch (error) {
+              console.error('Failed to toggle record with tray:', error)
+            }
+          }
+        )
 
         console.log('System tray event listeners set up successfully')
       } catch (error) {

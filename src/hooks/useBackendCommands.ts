@@ -24,6 +24,18 @@ export const useBackendCommands = (): BackendCommands => {
       reformatWithProfile: async () => {},
       showMainWindow: async () => {},
       hideMainWindow: async () => {},
+
+      // Profile management commands
+      loadProfiles: async () => {},
+      selectProfile: async () => {},
+      saveProfiles: async () => {},
+
+      // Advanced features
+      clearClipboardHistory: async () => {},
+      enableAutoRecovery: async () => {},
+      disableAutoRecovery: async () => {},
+      retryConnection: async () => {},
+      getClipboardHistory: async () => {},
     }
   )
 }

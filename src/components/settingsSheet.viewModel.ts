@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useProfiles, Profile } from '@/contexts/ProfileContext'
+import { useProfiles } from '@/hooks/useProfiles'
+import { Profile, ProfileCollection } from '@/store/slices/appSlice'
 import { SettingsConfig } from '@/types/settings'
 import { invoke } from '@tauri-apps/api/core'
+import { toast } from '@/components/ui/sonner'
 
 interface SettingsSheetState {
   view: 'overview' | 'editor'
@@ -83,6 +85,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
   // Ref for validation debouncing
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Use Redux-based profiles hook
   const {
     profiles,
     isLoading: isLoadingProfiles,
@@ -414,8 +417,13 @@ export function useSettingsSheetViewModel(onClose: () => void) {
           }
         }
 
-        // Save profiles
-        await invoke('save_profiles', { profiles })
+        // Save profiles using Redux profiles state
+        const profileCollection: ProfileCollection = {
+          profiles,
+          default_profile_id:
+            profiles.find((p) => p.active)?.id || profiles[0]?.id || '',
+        }
+        await invoke('save_profiles', { profiles: profileCollection })
         console.log('Profiles saved successfully')
 
         // Update original settings to reflect the saved state
@@ -490,6 +498,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
           (p) => p.id === profile.id
         )
         let updatedProfiles: Profile[]
+        let isNewProfile = false
 
         if (existingProfileIndex >= 0 && profile.id) {
           // Update existing profile
@@ -500,6 +509,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
           }
         } else {
           // Add new profile - generate ID if not present
+          isNewProfile = true
           const newProfile = {
             ...profile,
             id: profile.id || Date.now().toString(),
@@ -510,7 +520,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
         }
 
         // Save to backend
-        const profileCollection = {
+        const profileCollection: ProfileCollection = {
           profiles: updatedProfiles,
           default_profile_id:
             profiles.find((p) => p.active)?.id || updatedProfiles[0]?.id || '',
@@ -523,24 +533,47 @@ export function useSettingsSheetViewModel(onClose: () => void) {
 
         setView('overview')
         setEditingProfile(null)
+
+        // Show success toast
+        toast.success(
+          isNewProfile
+            ? 'Profile created successfully!'
+            : 'Profile updated successfully!',
+          {
+            description: `Profile "${profile.name}" has been saved.`,
+            duration: 3000,
+          }
+        )
       } catch (error) {
         console.error('Failed to save profile:', error)
-        setSaveError(
+        const errorMessage =
           error instanceof Error ? error.message : 'Failed to save profile'
-        )
+        setSaveError(errorMessage)
+
+        // Also show error toast
+        toast.error('Failed to save profile', {
+          description: errorMessage,
+          duration: 5000,
+        })
       }
     },
     deleteProfile: async (profileId: string) => {
       // Prevent deletion of clipboard profile
       if (profileId === '1') {
-        setSaveError('Cannot delete the clipboard profile')
+        const errorMessage = 'Cannot delete the clipboard profile'
+        setSaveError(errorMessage)
+        toast.error('Cannot delete profile', {
+          description: errorMessage,
+          duration: 5000,
+        })
         return
       }
 
       try {
+        const profileToDelete = profiles.find((p) => p.id === profileId)
         const updatedProfiles = profiles.filter((p) => p.id !== profileId)
 
-        const profileCollection = {
+        const profileCollection: ProfileCollection = {
           profiles: updatedProfiles,
           default_profile_id:
             profiles.find((p) => p.active && p.id !== profileId)?.id ||
@@ -555,11 +588,25 @@ export function useSettingsSheetViewModel(onClose: () => void) {
 
         setView('overview')
         setEditingProfile(null)
+
+        // Show success toast
+        toast.success('Profile deleted successfully!', {
+          description: `Profile "${
+            profileToDelete?.name || 'Unknown'
+          }" has been removed.`,
+          duration: 3000,
+        })
       } catch (error) {
         console.error('Failed to delete profile:', error)
-        setSaveError(
+        const errorMessage =
           error instanceof Error ? error.message : 'Failed to delete profile'
-        )
+        setSaveError(errorMessage)
+
+        // Also show error toast
+        toast.error('Failed to delete profile', {
+          description: errorMessage,
+          duration: 5000,
+        })
       }
     },
     toggleProfileVisibility: async (profileId: string, visible: boolean) => {
@@ -607,7 +654,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
             : p
         )
 
-        const profileCollection = {
+        const profileCollection: ProfileCollection = {
           profiles: updatedProfiles,
           default_profile_id:
             profiles.find((p) => p.active)?.id || updatedProfiles[0]?.id || '',
@@ -658,7 +705,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
           updated_at: new Date().toISOString(),
         }))
 
-        const profileCollection = {
+        const profileCollection: ProfileCollection = {
           profiles: profilesWithTimestamp,
           default_profile_id:
             profiles.find((p) => p.active)?.id ||

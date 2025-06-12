@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
 import { useSystemTray } from './hooks/useSystemTray'
+import { useBackendCommands } from './hooks/useBackendCommands'
 import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 export function useAppViewModel() {
   const { initializeTray, updateTrayStatus, hideWindow } = useSystemTray()
+  const { loadProfiles } = useBackendCommands()
   const [isSettingsWindow, setIsSettingsWindow] = useState(false)
 
   const closeSettings = useCallback(() => {
@@ -13,11 +14,16 @@ export function useAppViewModel() {
 
   const checkWindowType = useCallback(async () => {
     try {
-      const currentWindow = getCurrentWebviewWindow()
-      const windowLabel = currentWindow.label
-      setIsSettingsWindow(windowLabel === 'settings')
+      // Simple window type detection based on URL or location
+      const currentUrl = window.location.href
+      const isSettings =
+        currentUrl.includes('settings') ||
+        window.location.hash.includes('settings')
+      setIsSettingsWindow(isSettings)
     } catch (error) {
       console.error('Failed to get window info:', error)
+      // Default to main window if detection fails
+      setIsSettingsWindow(false)
     }
   }, [])
 
@@ -35,25 +41,6 @@ export function useAppViewModel() {
     console.log('Stopping recording from tray')
     updateTrayStatus('Ready')
     window.dispatchEvent(new CustomEvent('stop-recording'))
-  }, [updateTrayStatus])
-
-  const handleTrayToggleRecord = useCallback(async () => {
-    console.log('Toggling recording from tray')
-    try {
-      const result = await invoke('toggle_record_with_tray')
-      console.log('Toggle record result:', result)
-
-      if (typeof result === 'string' && result.includes('Recording started')) {
-        updateTrayStatus('Recording')
-      } else if (
-        typeof result === 'string' &&
-        result.includes('Recording stopped')
-      ) {
-        updateTrayStatus('Ready')
-      }
-    } catch (error) {
-      console.error('Failed to toggle recording:', error)
-    }
   }, [updateTrayStatus])
 
   const handleTrayShowSettings = useCallback(() => {
@@ -110,6 +97,16 @@ export function useAppViewModel() {
     }
   }, [initializeTray, isSettingsWindow])
 
+  const initializeBackendAndProfiles = useCallback(async () => {
+    // Load profiles on app startup
+    try {
+      await loadProfiles()
+      console.log('Profiles loaded successfully')
+    } catch (error) {
+      console.error('Failed to load profiles:', error)
+    }
+  }, [loadProfiles])
+
   const setupEventListeners = useCallback(() => {
     // Check window type
     checkWindowType()
@@ -121,7 +118,6 @@ export function useAppViewModel() {
     if (!isSettingsWindow) {
       window.addEventListener('tray-start-recording', handleTrayStartRecording)
       window.addEventListener('tray-stop-recording', handleTrayStopRecording)
-      window.addEventListener('tray-toggle-record', handleTrayToggleRecord)
       window.addEventListener('tray-show-settings', handleTrayShowSettings)
       window.addEventListener('beforeunload', handleBeforeUnload)
     }
@@ -137,7 +133,6 @@ export function useAppViewModel() {
           'tray-stop-recording',
           handleTrayStopRecording
         )
-        window.removeEventListener('tray-toggle-record', handleTrayToggleRecord)
         window.removeEventListener('tray-show-settings', handleTrayShowSettings)
         window.removeEventListener('beforeunload', handleBeforeUnload)
       }
@@ -147,7 +142,6 @@ export function useAppViewModel() {
     handleShowSettings,
     handleTrayStartRecording,
     handleTrayStopRecording,
-    handleTrayToggleRecord,
     handleTrayShowSettings,
     handleBeforeUnload,
     isSettingsWindow,
@@ -155,9 +149,25 @@ export function useAppViewModel() {
 
   const onMount = useCallback(() => {
     const cleanup = setupEventListeners()
-    initializeTrayAndShortcuts()
+
+    // Initialize async operations in sequence
+    const initializeApp = async () => {
+      try {
+        await initializeTrayAndShortcuts()
+        await initializeBackendAndProfiles()
+        console.log('App initialization completed')
+      } catch (error) {
+        console.error('App initialization failed:', error)
+      }
+    }
+
+    initializeApp()
     return cleanup
-  }, [setupEventListeners, initializeTrayAndShortcuts])
+  }, [
+    setupEventListeners,
+    initializeTrayAndShortcuts,
+    initializeBackendAndProfiles,
+  ])
 
   return {
     state: {

@@ -1,192 +1,156 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock the hooks and contexts
-const mockUseRecording = vi.fn()
+// Mock Redux hooks instead of the Recording Context
+const mockUseAppSelector = vi.fn()
 const mockUseRmsData = vi.fn()
 
-vi.mock('../contexts/RecordingContext', () => ({
-  useRecording: mockUseRecording,
+vi.mock('../../store/hooks', () => ({
+  useAppSelector: mockUseAppSelector,
 }))
 
 vi.mock('../hooks/useRmsData', () => ({
   useRmsData: mockUseRmsData,
 }))
 
-// Mock VolumeBar component
-vi.mock('../VolumeBar', () => ({
-  default: ({
-    height,
-    delay,
-    isRecording,
-    rmsValue,
-  }: {
-    height: number
-    delay: number
-    isRecording: boolean
-    rmsValue: number
-  }) => (
-    <div
-      data-testid="volume-bar"
-      data-height={height}
-      data-delay={delay}
-      data-recording={isRecording}
-      data-rms={rmsValue}
-    />
-  ),
-}))
+// Mock data for tests
+const mockRmsData = {
+  value: 0.5,
+  isActive: true,
+  timestamp: Date.now(),
+}
 
-describe('VolumeVisualizer Component', () => {
+describe('VolumeVisualizer Component Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Default mock implementations
-    mockUseRecording.mockReturnValue({
-      isRecording: false,
+    // Default mocks
+    mockUseAppSelector.mockReturnValue({ status: 'idle' })
+    mockUseRmsData.mockReturnValue(mockRmsData)
+  })
+
+  describe('Recording State Detection', () => {
+    it('should detect recording state from Redux', () => {
+      mockUseAppSelector.mockReturnValue({ status: 'recording' })
+
+      const { status } = mockUseAppSelector()
+      const isRecording = status === 'recording'
+
+      expect(isRecording).toBe(true)
     })
 
-    mockUseRmsData.mockReturnValue({
-      value: 0.0,
-      timestamp: Date.now(),
-      isActive: false,
+    it('should detect idle state from Redux', () => {
+      mockUseAppSelector.mockReturnValue({ status: 'idle' })
+
+      const { status } = mockUseAppSelector()
+      const isRecording = status === 'recording'
+
+      expect(isRecording).toBe(false)
+    })
+
+    it('should detect processing states as not recording', () => {
+      mockUseAppSelector.mockReturnValue({ status: 'processing-transcription' })
+
+      const { status } = mockUseAppSelector()
+      const isRecording = status === 'recording'
+
+      expect(isRecording).toBe(false)
     })
   })
 
-  it('should have proper accessibility attributes structure', () => {
-    // Test the expected accessibility structure
-    const mockProps = {
-      role: 'progressbar',
-      'aria-valuenow': 0,
-      'aria-valuemin': 0,
-      'aria-valuemax': 100,
-      'aria-label': 'Volume level',
-      'aria-live': 'polite',
-      'aria-atomic': 'false',
-      tabIndex: 0,
-    }
-
-    expect(mockProps).toHaveProperty('role', 'progressbar')
-    expect(mockProps).toHaveProperty('aria-valuenow')
-    expect(mockProps).toHaveProperty('aria-valuemin', 0)
-    expect(mockProps).toHaveProperty('aria-valuemax', 100)
-    expect(mockProps).toHaveProperty('aria-label', 'Volume level')
-    expect(mockProps).toHaveProperty('aria-live', 'polite')
-    expect(mockProps).toHaveProperty('aria-atomic', 'false')
-    expect(mockProps).toHaveProperty('tabIndex', 0)
-  })
-
-  it('should calculate RMS percentage correctly', () => {
-    // Test RMS value to percentage conversion
-    const calculatePercentage = (value: number) => Math.round(value * 100)
-
-    expect(calculatePercentage(0.0)).toBe(0)
-    expect(calculatePercentage(0.5)).toBe(50)
-    expect(calculatePercentage(1.0)).toBe(100)
-    expect(calculatePercentage(0.75)).toBe(75)
-  })
-
-  it('should generate correct number of bars', () => {
-    // Test that 100 bars are generated
-    const bars = Array.from({ length: 100 }, (_, index) => ({ id: index }))
-    expect(bars).toHaveLength(100)
-    expect(bars[0].id).toBe(0)
-    expect(bars[99].id).toBe(99)
-  })
-
-  it('should calculate bar heights based on recording state', () => {
-    // Test bar height calculation logic
-    const calculateBarHeight = (
-      isRecording: boolean,
-      rmsActive: boolean,
-      rmsValue: number,
-      index: number
-    ) => {
-      if (isRecording && rmsActive) {
-        const baseHeight = rmsValue * 100
-        const variation = (Math.sin(index * 0.1 + Date.now() * 0.005) + 1) * 0.3
-        return Math.max(5, Math.min(100, baseHeight * (0.7 + variation)))
-      } else {
-        return Math.random() * 15 + 5 // This would be mocked in real test
-      }
-    }
-
-    // Test recording state with RMS data
-    const recordingHeight = calculateBarHeight(true, true, 0.8, 0)
-    expect(recordingHeight).toBeGreaterThanOrEqual(5)
-    expect(recordingHeight).toBeLessThanOrEqual(100)
-
-    // Test idle state
-    const idleHeight = calculateBarHeight(false, false, 0.0, 0)
-    expect(idleHeight).toBeGreaterThanOrEqual(5)
-    expect(idleHeight).toBeLessThanOrEqual(20)
-  })
-
-  it('should use real RMS data when recording and active', () => {
-    mockUseRecording.mockReturnValue({ isRecording: true })
-    mockUseRmsData.mockReturnValue({
-      value: 0.6,
-      timestamp: Date.now(),
-      isActive: true,
+  describe('RMS Data Integration', () => {
+    it('should use RMS data with throttling enabled', () => {
+      expect(mockUseRmsData).toHaveBeenCalledWith({ throttle: true })
     })
 
-    const { value, isActive } = mockUseRmsData()
-    const { isRecording } = mockUseRecording()
+    it('should handle RMS value amplification', () => {
+      const testValue = 0.2
+      mockUseRmsData.mockReturnValue({
+        ...mockRmsData,
+        value: testValue,
+      })
 
-    expect(isRecording).toBe(true)
-    expect(isActive).toBe(true)
-    expect(value).toBe(0.6)
-  })
+      const rmsData = mockUseRmsData()
+      const amplifiedRms = Math.min(1.0, rmsData.value * 6.0)
+      const rmsPercentage = Math.round(amplifiedRms * 100)
 
-  it('should handle idle state correctly', () => {
-    mockUseRecording.mockReturnValue({ isRecording: false })
-    mockUseRmsData.mockReturnValue({
-      value: 0.0,
-      timestamp: Date.now(),
-      isActive: false,
+      expect(amplifiedRms).toBe(1.2) // Will be clamped to 1.0
+      expect(Math.min(1.0, amplifiedRms)).toBe(1.0)
+      expect(rmsPercentage).toBe(100)
     })
 
-    const { value, isActive } = mockUseRmsData()
-    const { isRecording } = mockUseRecording()
+    it('should handle low RMS values correctly', () => {
+      const testValue = 0.05
+      mockUseRmsData.mockReturnValue({
+        ...mockRmsData,
+        value: testValue,
+      })
 
-    expect(isRecording).toBe(false)
-    expect(isActive).toBe(false)
-    expect(value).toBe(0.0)
+      const rmsData = mockUseRmsData()
+      const amplifiedRms = Math.min(1.0, rmsData.value * 6.0)
+      const rmsPercentage = Math.round(amplifiedRms * 100)
+
+      expect(amplifiedRms).toBe(0.3)
+      expect(rmsPercentage).toBe(30)
+    })
   })
 
-  it('should pass correct props to VolumeBar components', () => {
-    // Test the expected props structure for VolumeBar
-    const mockBarProps = {
-      height: 50,
-      delay: 100,
-      isRecording: true,
-      rmsValue: 0.5,
-    }
+  describe('Timeline Buffer Logic', () => {
+    it('should process timeline values correctly', () => {
+      const timelineBuffer = new Array(60).fill(0)
+      const testValue = 0.5
 
-    expect(mockBarProps).toHaveProperty('height')
-    expect(mockBarProps).toHaveProperty('delay')
-    expect(mockBarProps).toHaveProperty('isRecording')
-    expect(mockBarProps).toHaveProperty('rmsValue')
-    expect(typeof mockBarProps.height).toBe('number')
-    expect(typeof mockBarProps.delay).toBe('number')
-    expect(typeof mockBarProps.isRecording).toBe('boolean')
-    expect(typeof mockBarProps.rmsValue).toBe('number')
+      // Simulate adding a new value to timeline
+      const newTimelineBuffer = [
+        ...timelineBuffer.slice(1),
+        testValue > 0.008 ? testValue : 0,
+      ]
+
+      expect(newTimelineBuffer.length).toBe(60)
+      expect(newTimelineBuffer[59]).toBe(testValue) // Latest value
+      expect(newTimelineBuffer[0]).toBe(0) // Oldest value shifted out
+    })
+
+    it('should filter out very low values', () => {
+      const lowValue = 0.005 // Below 0.008 threshold
+
+      const filteredValue = lowValue > 0.008 ? lowValue : 0
+      expect(filteredValue).toBe(0)
+    })
+
+    it('should preserve values above threshold', () => {
+      const goodValue = 0.02 // Above 0.008 threshold
+
+      const filteredValue = goodValue > 0.008 ? goodValue : 0
+      expect(filteredValue).toBe(goodValue)
+    })
   })
 
-  it('should validate CSS class names', () => {
-    // Test CSS class generation logic
-    const generateClassName = (isRecording: boolean) =>
-      `volume-visualizer ${isRecording ? 'recording' : 'idle'}`
+  describe('Volume Bar Generation', () => {
+    it('should generate correct bar props', () => {
+      const timelineBuffer = [0.1, 0.2, 0.3, 0.4, 0.5]
 
-    expect(generateClassName(true)).toBe('volume-visualizer recording')
-    expect(generateClassName(false)).toBe('volume-visualizer idle')
-  })
+      const bars = timelineBuffer.map((value, index) => {
+        const delay = (timelineBuffer.length - 1 - index) * 50
+        const height = Math.round(value * 50)
 
-  it('should validate screen reader text', () => {
-    // Test screen reader text generation
-    const generateSRText = (percentage: number, isRecording: boolean) =>
-      `Volume level: ${percentage}%${isRecording ? ' - Recording' : ' - Idle'}`
+        return {
+          height,
+          delay,
+          value,
+        }
+      })
 
-    expect(generateSRText(75, true)).toBe('Volume level: 75% - Recording')
-    expect(generateSRText(0, false)).toBe('Volume level: 0% - Idle')
-    expect(generateSRText(100, true)).toBe('Volume level: 100% - Recording')
+      expect(bars[0]).toEqual({
+        height: 5, // 0.1 * 50
+        delay: 200, // (5-1-0) * 50
+        value: 0.1,
+      })
+
+      expect(bars[4]).toEqual({
+        height: 25, // 0.5 * 50
+        delay: 0, // (5-1-4) * 50
+        value: 0.5,
+      })
+    })
   })
 })

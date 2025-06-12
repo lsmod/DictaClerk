@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Profile } from '@/contexts/ProfileContext'
+import { Profile } from '@/store/slices/appSlice'
 
 interface ProfileEditorState {
   formData: Profile
@@ -9,16 +9,11 @@ interface ProfileEditorState {
 }
 
 interface ProfileEditorActions {
-  updateName: (name: string) => void
-  updateDescription: (description: string) => void
-  updatePrompt: (prompt: string) => void
-  updateExampleInput: (exampleInput: string) => void
-  updateExampleOutput: (exampleOutput: string) => void
-  updateShortcut: (shortcut: string) => void
-  updateVisible: (visible: boolean) => void
-  saveProfile: () => void
-  deleteProfile: () => void
+  updateFormData: (field: keyof Profile, value: string | boolean) => void
+  handleSave: () => void
+  handleDelete: () => void
   navigateBack: () => void
+  canSave: () => boolean
 }
 
 // Window-level view model
@@ -74,15 +69,6 @@ export function useProfileEditorViewModel(
       newErrors.name = 'Name is required'
     }
 
-    if (!formData.prompt?.trim()) {
-      newErrors.prompt = 'Prompt is required'
-    }
-
-    if (formData.example_input?.trim() && !formData.example_output?.trim()) {
-      newErrors.example_output =
-        'Example Output is required when Example Input is provided'
-    }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -94,33 +80,23 @@ export function useProfileEditorViewModel(
   }
 
   const actions: ProfileEditorActions = {
-    updateName: (name: string) => {
-      setFormData((prev) => ({ ...prev, name }))
+    updateFormData: (field: keyof Profile, value: string | boolean) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      // Clear error for this field when user starts typing
+      if (errors[field]) {
+        setErrors((prev) => {
+          const updated = { ...prev }
+          delete updated[field]
+          return updated
+        })
+      }
     },
-    updateDescription: (description: string) => {
-      setFormData((prev) => ({ ...prev, description }))
-    },
-    updatePrompt: (prompt: string) => {
-      setFormData((prev) => ({ ...prev, prompt }))
-    },
-    updateExampleInput: (exampleInput: string) => {
-      setFormData((prev) => ({ ...prev, example_input: exampleInput }))
-    },
-    updateExampleOutput: (exampleOutput: string) => {
-      setFormData((prev) => ({ ...prev, example_output: exampleOutput }))
-    },
-    updateShortcut: (shortcut: string) => {
-      setFormData((prev) => ({ ...prev, shortcut }))
-    },
-    updateVisible: (visible: boolean) => {
-      setFormData((prev) => ({ ...prev, visible }))
-    },
-    saveProfile: () => {
+    handleSave: () => {
       if (validateForm()) {
         onSave(formData)
       }
     },
-    deleteProfile: () => {
+    handleDelete: () => {
       if (
         profile.id &&
         confirm('Are you sure you want to delete this profile?')
@@ -129,6 +105,9 @@ export function useProfileEditorViewModel(
       }
     },
     navigateBack: onBack,
+    canSave: () => {
+      return Boolean(formData.name?.trim() && Object.keys(errors).length === 0)
+    },
   }
 
   const onMount = () => {

@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { TooltipProvider } from '../components/ui/tooltip'
-import { ProfileProvider } from '../contexts/ProfileContext'
 import SettingsSheet from '../components/SettingsSheet'
 import { useSettingsWindowViewModel } from './settingsWindow.viewModel'
+import { Toaster } from '@/components/ui/sonner'
 
 export default function SettingsWindow() {
   const { actions, onMount } = useSettingsWindowViewModel()
@@ -10,12 +10,13 @@ export default function SettingsWindow() {
   useEffect(onMount, [onMount])
 
   return (
-    <ProfileProvider>
-      <TooltipProvider>
-        <div className="settings-window">
-          <SettingsSheet onClose={actions.closeSettings} />
-        </div>
-      </TooltipProvider>
-    </ProfileProvider>
+    <TooltipProvider>
+      <div className="settings-sheet">
+        <SettingsSheet onClose={actions.closeSettings} />
+
+        {/* Toast notifications for settings and profile operations */}
+        <Toaster />
+      </div>
+    </TooltipProvider>
   )
 }
