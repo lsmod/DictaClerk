@@ -530,6 +530,38 @@ impl AppStateMachine {
                 // Profile selection is allowed from settings window - state doesn't change
                 Ok(self.current_state.clone())
             }
+            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ToggleRecording) => {
+                // Allow toggle recording from settings window - close settings and toggle recording
+                match previous_state.as_ref() {
+                    AppState::Idle { .. } => Ok(AppState::Recording {
+                        started_at: SystemTime::now(),
+                    }),
+                    AppState::Recording { .. } => {
+                        // If we were recording before opening settings, stop recording
+                        Ok(AppState::ProcessingTranscription {
+                            wav_path: PathBuf::from("/tmp/recording.wav"), // This will be updated by the actual command
+                            started_at: SystemTime::now(),
+                        })
+                    }
+                    _ => {
+                        // For other states, just close settings and return to previous state
+                        Ok(*previous_state.clone())
+                    }
+                }
+            }
+            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ShowMainWindow) => {
+                // Show main window and close settings
+                match previous_state.as_ref() {
+                    AppState::Idle { .. } => Ok(AppState::Idle {
+                        main_window_visible: true,
+                    }),
+                    _ => Ok(*previous_state.clone()),
+                }
+            }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::OpenSettingsWindow) => {
+                // Settings window is already open - no state change
+                Ok(self.current_state.clone())
+            }
             (AppState::SettingsWindowOpen { .. }, AppEvent::StartNewProfile) => {
                 Ok(AppState::NewProfileEditorOpen {
                     settings_context: Box::new(self.current_state.clone()),
@@ -890,6 +922,38 @@ impl AppStateMachine {
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::SelectProfile { .. }) => {
                 // Profile selection is allowed from settings window - state doesn't change
+                Ok(current_state.clone())
+            }
+            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ToggleRecording) => {
+                // Allow toggle recording from settings window - close settings and toggle recording
+                match previous_state.as_ref() {
+                    AppState::Idle { .. } => Ok(AppState::Recording {
+                        started_at: SystemTime::now(),
+                    }),
+                    AppState::Recording { .. } => {
+                        // If we were recording before opening settings, stop recording
+                        Ok(AppState::ProcessingTranscription {
+                            wav_path: PathBuf::from("/tmp/recording.wav"), // This will be updated by the actual command
+                            started_at: SystemTime::now(),
+                        })
+                    }
+                    _ => {
+                        // For other states, just close settings and return to previous state
+                        Ok(*previous_state.clone())
+                    }
+                }
+            }
+            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ShowMainWindow) => {
+                // Show main window and close settings
+                match previous_state.as_ref() {
+                    AppState::Idle { .. } => Ok(AppState::Idle {
+                        main_window_visible: true,
+                    }),
+                    _ => Ok(*previous_state.clone()),
+                }
+            }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::OpenSettingsWindow) => {
+                // Settings window is already open - no state change
                 Ok(current_state.clone())
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::StartNewProfile) => {

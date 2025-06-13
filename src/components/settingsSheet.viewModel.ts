@@ -381,9 +381,30 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       try {
         console.log('Saving settings...', settings)
 
+        // Check if global shortcut has changed
+        const shortcutChanged =
+          originalSettings &&
+          settings.global_shortcut !== originalSettings.global_shortcut
+
         // Save settings first
         await invoke('save_settings', { settings })
         console.log('Settings saved successfully')
+
+        // Update global shortcut if it changed
+        if (shortcutChanged) {
+          try {
+            await invoke('update_global_shortcut', {
+              newShortcut: settings.global_shortcut,
+            })
+            console.log('Global shortcut updated to:', settings.global_shortcut)
+          } catch (shortcutError) {
+            console.error('Failed to update global shortcut:', shortcutError)
+            // Don't fail the save operation, but show a warning
+            setSaveError(
+              `Settings saved but failed to update global shortcut: ${shortcutError}`
+            )
+          }
+        }
 
         // Reinitialize Whisper client if API key is provided
         if (

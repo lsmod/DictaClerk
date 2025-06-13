@@ -515,7 +515,13 @@ pub async fn validate_shortcut_conflict(
     let state_guard = state.lock().await;
 
     if let Some(ref mgr) = *state_guard {
-        // Check if the shortcut is already registered
+        // If the shortcut is the same as the current global shortcut, it's valid
+        // (user is not changing it or changing it back to the same value)
+        if shortcut == mgr.get_shortcut() {
+            return Ok(true);
+        }
+
+        // Check if the shortcut is already registered for other purposes
         let is_registered = mgr.is_shortcut_registered(&shortcut).await;
         // Return true if NOT conflicting (i.e., not registered)
         Ok(!is_registered)
