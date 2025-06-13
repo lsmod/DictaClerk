@@ -1,3 +1,4 @@
+import React from 'react'
 import { useEffect } from 'react'
 import { TooltipProvider } from '../components/ui/tooltip'
 import RecordStopToggleButton from '../components/StopButton'
@@ -7,9 +8,13 @@ import VolumeVisualizer from '../components/VolumeVisualizer'
 import SettingsButton from '../components/SettingsButton'
 import { useMainWindowViewModel } from './mainWindow.viewModel'
 import { Toaster } from '@/components/ui/sonner'
+import { useProcessingToasts } from '../hooks/useProcessingToasts'
 
 export default function MainWindow() {
   const { onMount } = useMainWindowViewModel()
+
+  // Initialize processing toasts
+  useProcessingToasts()
 
   useEffect(onMount, [onMount])
 
