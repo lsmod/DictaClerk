@@ -5,7 +5,7 @@ use crate::commands::{AudioCaptureState, SystemTrayState};
 use crate::services::{ShortcutMgr, ShortcutMgrConfig};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use tokio::sync::Mutex;
 
 /// Global state for the shortcut manager
@@ -80,7 +80,7 @@ pub async fn auto_init_shortcut_mgr(
 /// Toggle recording state with system tray integration - this is called by the global shortcut
 #[tauri::command]
 pub async fn toggle_record_with_tray(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     state_machine_state: State<'_, crate::state::AppStateMachineState>,
     tray_state: State<'_, SystemTrayState>,
     audio_state: State<'_, crate::commands::AudioCaptureState>,
@@ -103,23 +103,34 @@ pub async fn toggle_record_with_tray(
     }
 
     // Check if settings window is open - if so, completely ignore the shortcut
-    if app_handle.get_webview_window("settings").is_some() {
-        println!("🚫 [SHORTCUT] Settings window open - ignoring shortcut");
-        return Ok("Global shortcut ignored - settings window is open".to_string());
-    }
+    // COMMENTED OUT: This causes race conditions between window closing and state machine updates
+    // if app_handle.get_webview_window("settings").is_some() {
+    //     println!("🚫 [SHORTCUT] Settings window open - ignoring shortcut");
+    //     return Ok("Global shortcut ignored - settings window is open".to_string());
+    // }
 
-    // Check if we're in SettingsWindowOpen state - double check via state machine
+    // Check if we're in SettingsWindowOpen state - use state machine as single source of truth
     {
         let state_guard = state_machine_state.lock().await;
         if let Some(ref state_machine) = *state_guard {
             let machine_guard = state_machine.lock().await;
+            let current_state = machine_guard.current_state();
+            println!(
+                "🔍 [SHORTCUT] Current state machine state: {:?}",
+                current_state
+            );
+
             if matches!(
-                machine_guard.current_state(),
+                current_state,
                 crate::state::AppState::SettingsWindowOpen { .. }
             ) {
                 println!("🚫 [SHORTCUT] In settings window state - ignoring shortcut");
                 return Ok("Global shortcut ignored - in settings window state".to_string());
+            } else {
+                println!("✅ [SHORTCUT] Not in settings window state, proceeding...");
             }
+        } else {
+            println!("❌ [SHORTCUT] State machine not found");
         }
     }
 

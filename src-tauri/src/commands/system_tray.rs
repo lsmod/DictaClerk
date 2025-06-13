@@ -4,7 +4,7 @@ use crate::commands::state_machine::process_event;
 use crate::services::{SystemTrayConfig, SystemTrayService};
 use crate::state::{AppEvent, AppStateMachineState};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, WebviewWindowBuilder, WindowEvent};
 use tokio::sync::Mutex;
 
 /// Global state for the system tray service
@@ -243,6 +243,47 @@ pub async fn open_settings_window(
     .build()
     .map_err(|e| format!("Failed to create settings window: {}", e))?;
 
+    // Register a close event handler to ensure state machine is updated when window is closed
+    let app_handle_clone = app_handle.clone();
+    let state_machine_clone = state_machine_state.inner().clone();
+    let tray_state_clone = tray_state.inner().clone();
+
+    _settings_window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { .. } = event {
+            println!("🚨 [SETTINGS-WINDOW] Close requested - updating state machine");
+            let _app_handle = app_handle_clone.clone();
+            let state_machine = state_machine_clone.clone();
+            let tray_state = tray_state_clone.clone();
+
+            tauri::async_runtime::spawn(async move {
+                // Directly update the state machine without using process_event wrapper
+                {
+                    let state_guard = state_machine.lock().await;
+                    if let Some(ref state_machine_arc) = *state_guard {
+                        let mut machine_guard = state_machine_arc.lock().await;
+                        if let Err(e) = machine_guard.process_event(AppEvent::CloseSettingsWindow).await {
+                            eprintln!("❌ [SETTINGS-WINDOW] Failed to process CloseSettingsWindow event: {}", e);
+                        } else {
+                            println!("✅ [SETTINGS-WINDOW] CloseSettingsWindow event processed successfully");
+                        }
+                    } else {
+                        eprintln!("❌ [SETTINGS-WINDOW] State machine not initialized");
+                    }
+                }
+
+                // Show main window after closing settings
+                let tray_guard = tray_state.lock().await;
+                if let Some(ref service) = *tray_guard {
+                    if let Err(e) = service.show_main_window().await {
+                        eprintln!("Warning: Failed to show main window when closing settings: {}", e);
+                    } else {
+                        println!("✅ [SETTINGS-WINDOW] Main window shown successfully");
+                    }
+                }
+            });
+        }
+    });
+
     // Emit event to the settings window to show settings content
     // Note: The frontend should listen to app-state-changed events from the state machine
     // to determine what content to show in the settings window
@@ -256,12 +297,56 @@ pub async fn close_settings_window(
     state_machine_state: State<'_, AppStateMachineState>,
     tray_state: State<'_, SystemTrayState>,
 ) -> Result<String, String> {
-    // First emit event to state machine - this will transition to Idle{main_window_visible: true}
+    println!("🔧 [CLOSE-SETTINGS] Starting to close settings window");
+
+    // First check the current state before closing
+    {
+        let state_guard = state_machine_state.lock().await;
+        if let Some(ref state_machine) = *state_guard {
+            let machine_guard = state_machine.lock().await;
+            let current_state = machine_guard.current_state();
+            println!(
+                "🔍 [CLOSE-SETTINGS] Current state before closing: {:?}",
+                current_state
+            );
+        }
+    }
+
+    // First close the actual window to immediately remove it from the window manager
+    let window_was_found = if let Some(window) = app_handle.get_webview_window("settings") {
+        window
+            .close()
+            .map_err(|e| format!("Failed to close settings window: {}", e))?;
+        println!("✅ [CLOSE-SETTINGS] Settings window closed successfully");
+        true
+    } else {
+        println!("⚠️ [CLOSE-SETTINGS] Settings window not found");
+        false
+    };
+
+    // Then emit event to state machine - this will transition to Idle{main_window_visible: true}
+    println!("🔄 [CLOSE-SETTINGS] Processing CloseSettingsWindow event...");
     if let Err(e) = process_event(AppEvent::CloseSettingsWindow, &state_machine_state).await {
         eprintln!(
-            "Warning: Failed to process CloseSettingsWindow event: {}",
+            "❌ [CLOSE-SETTINGS] Failed to process CloseSettingsWindow event: {}",
             e
         );
+        return Err(format!("Failed to update state machine: {}", e));
+    } else {
+        println!("✅ [CLOSE-SETTINGS] CloseSettingsWindow event processed successfully");
+    }
+
+    // Check the state after processing the event
+    {
+        let state_guard = state_machine_state.lock().await;
+        if let Some(ref state_machine) = *state_guard {
+            let machine_guard = state_machine.lock().await;
+            let current_state = machine_guard.current_state();
+            println!(
+                "🔍 [CLOSE-SETTINGS] Current state after event: {:?}",
+                current_state
+            );
+        }
     }
 
     // Always show main window after closing settings (as per state machine transition to Idle)
@@ -272,16 +357,15 @@ pub async fn close_settings_window(
                 "Warning: Failed to show main window when closing settings: {}",
                 e
             );
+        } else {
+            println!("✅ [CLOSE-SETTINGS] Main window shown successfully");
         }
     }
 
-    if let Some(window) = app_handle.get_webview_window("settings") {
-        window
-            .close()
-            .map_err(|e| format!("Failed to close settings window: {}", e))?;
+    if window_was_found {
         Ok("Settings window closed".to_string())
     } else {
-        Err("Settings window not found".to_string())
+        Ok("Settings window was not found, but state updated".to_string())
     }
 }
 
