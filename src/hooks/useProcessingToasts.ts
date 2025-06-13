@@ -16,7 +16,8 @@ export const useProcessingToasts = () => {
 
   // Handle processing state toasts
   useEffect(() => {
-    const isProcessing = status.startsWith('processing')
+    const isProcessing =
+      status.startsWith('processing') && status !== 'processing-complete'
 
     console.log('🍞 [TOAST] Processing state check:', {
       status,
@@ -29,8 +30,16 @@ export const useProcessingToasts = () => {
       // Show processing toast
       console.log('🍞 [TOAST] Showing processing toast')
       wasProcessingRef.current = true
+
+      // Check if this is a reformat operation based on the status transition
+      const isReformat =
+        wasProcessingRef.current && status.startsWith('processing')
+      const description = isReformat
+        ? 'Reformatting with selected profile...'
+        : 'Transcribing and formatting your audio'
+
       processingToastRef.current = toast.loading('Processing recording...', {
-        description: 'Transcribing and formatting your audio',
+        description,
         duration: Infinity, // Keep until processing is done
       })
     } else if (!isProcessing && processingToastRef.current) {
@@ -51,8 +60,8 @@ export const useProcessingToasts = () => {
         console.log('🍞 [TOAST] ℹ️ Processing completed, transitioned to idle')
         // Also show success toast when transitioning to idle after processing
         // This handles cases where we go directly from processing to idle
-        toast.success('Recording processed successfully!', {
-          description: 'Text has been copied to clipboard',
+        toast.success('Text copied to clipboard!', {
+          description: 'Processing completed successfully',
           duration: 4000,
         })
         wasProcessingRef.current = false

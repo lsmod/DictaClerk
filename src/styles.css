@@ -1836,3 +1836,36 @@
   outline: 2px solid #ff6b6b;
   outline-offset: 2px;
 }
+
+/* Profile buttons when processing is complete or transcript is available for reformatting - indicate they're interactive */
+.profile-buttons[data-processing-complete='true'] .profile-button {
+  border-color: rgba(0, 255, 204, 0.4);
+  background: linear-gradient(145deg, #2a3a2a, #1a2a1a);
+  animation: pulse-reformat 2s ease-in-out infinite;
+}
+
+.profile-buttons[data-processing-complete='true'] .profile-button:hover {
+  border-color: #00ffcc;
+  background: linear-gradient(145deg, #3a4a3a, #2a3a2a);
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+  transform: translateY(-2px);
+}
+
+.profile-buttons[data-processing-complete='true'] .profile-button.clipboard {
+  border-color: rgba(0, 255, 204, 0.6);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
+}
+
+@keyframes pulse-reformat {
+  0%,
+  100% {
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.3),
+      0 0 0 0 rgba(0, 255, 204, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.3),
+      0 0 0 4px rgba(0, 255, 204, 0);
+  }
+}

@@ -1,5 +1,7 @@
 import { useProfiles } from '@/hooks/useProfiles'
 import { Profile } from '@/store/slices/appSlice'
+import { useAppSelector } from '@/store/hooks'
+import { useBackendCommands } from '@/hooks/useBackendCommands'
 
 interface ProfileButtonsState {
   visibleProfiles: Profile[]
@@ -29,6 +31,16 @@ export const useProfileButtonsViewModel = () => {
     isClipboardProfile,
   } = useProfiles()
 
+  const { reformatWithProfile } = useBackendCommands()
+  const { status, originalTranscript } = useAppSelector((state) => state.app)
+
+  // Check if we can reformat: either processing is complete OR we're idle with transcript data
+  const canReformat =
+    status === 'processing-complete' ||
+    (status === 'idle' &&
+      originalTranscript &&
+      originalTranscript.trim().length > 0)
+
   const announceProfileChange = (profileName: string) => {
     const liveRegion = document.getElementById('main-live-region')
     if (liveRegion) {
@@ -51,14 +63,40 @@ export const useProfileButtonsViewModel = () => {
 
   const handleProfileClick = async (profileId: string) => {
     try {
-      await selectProfileCmd(profileId)
+      // If we can reformat (processing complete or idle with transcript), reformat with the selected profile
+      if (canReformat) {
+        if (isClipboardProfile(profileId)) {
+          // For clipboard profile, copy the original transcript directly
+          console.log(
+            'Copying original transcript to clipboard (clipboard profile selected)'
+          )
+          // The backend will handle copying the original transcript
+          await reformatWithProfile(profileId)
+        } else {
+          // For other profiles, reformat the original transcript
+          console.log('Reformatting with profile:', profileId)
+          await reformatWithProfile(profileId)
+        }
+      } else {
+        // Normal profile selection during idle state without transcript data
+        await selectProfileCmd(profileId)
+      }
+
       const profile = visibleProfiles.find((p) => p.id === profileId)
       if (profile) {
-        announceProfileChange(profile.name)
+        if (canReformat) {
+          announceProfileChange(`Reformatting with ${profile.name}`)
+        } else {
+          announceProfileChange(`Selected profile: ${profile.name}`)
+        }
       }
     } catch (err) {
-      console.error('Failed to select profile:', err)
-      announceError('Failed to select profile')
+      console.error('Failed to select/reformat with profile:', err)
+      if (canReformat) {
+        announceError('Failed to reformat with profile')
+      } else {
+        announceError('Failed to select profile')
+      }
     }
   }
 
@@ -99,5 +137,5 @@ export const useProfileButtonsViewModel = () => {
     // No initialization needed for this component
   }
 
-  return { state, actions, onMount }
+  return { state, actions, onMount, canReformat }
 }

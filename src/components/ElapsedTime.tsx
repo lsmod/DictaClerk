@@ -9,7 +9,8 @@ const ElapsedTime: React.FC = () => {
   )
 
   const isRecording = status === 'recording'
-  const isProcessing = status.startsWith('processing')
+  const isProcessing =
+    status.startsWith('processing') && status !== 'processing-complete'
 
   // Update recording time every second when recording
   useEffect(() => {

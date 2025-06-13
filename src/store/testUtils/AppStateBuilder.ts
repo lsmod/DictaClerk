@@ -8,14 +8,45 @@ export class AppStateBuilder {
       status: 'idle',
       mainWindowVisible: true,
       hasModalWindow: false,
+      windowState: {
+        mainWindow: {
+          visible: true,
+          focused: true,
+        },
+        settingsWindow: {
+          visible: false,
+          focused: false,
+        },
+        profileEditorWindow: {
+          visible: false,
+          focused: false,
+          editingProfileId: null,
+        },
+      },
       recordingStartTime: null,
       recordingTime: 0,
       originalTranscript: null,
       finalText: null,
       profileId: null,
+      processingProgress: null,
+      profiles: [],
+      activeProfileId: null,
+      profilesLoading: false,
+      profilesError: null,
       error: null,
+      errors: [],
+      lastError: null,
+      clipboard: {
+        lastCopiedText: null,
+        lastCopiedAt: null,
+        copyHistory: [],
+      },
       lastBackendSync: 0,
       backendConnected: true,
+      connectionRetries: 0,
+      systemTrayVisible: true,
+      shortcutsEnabled: true,
+      autoRecoveryMode: false,
     }
   }
 

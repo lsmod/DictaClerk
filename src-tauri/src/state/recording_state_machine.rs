@@ -485,6 +485,17 @@ impl AppStateMachine {
                 transcript: original_transcript.clone(),
                 main_window_visible: true,
             }),
+            (
+                AppState::ProcessingGPTFormatting {
+                    original_transcript,
+                    ..
+                },
+                AppEvent::SkipFormattingToClipboard { transcript },
+            ) => Ok(AppState::ProcessingClipboard {
+                original_transcript: original_transcript.clone(),
+                text: transcript.clone(),
+                started_at: current_time,
+            }),
 
             (
                 AppState::ProcessingClipboard {
@@ -523,6 +534,12 @@ impl AppStateMachine {
                 })
             }
             (AppState::ProcessingComplete { .. }, AppEvent::StartRecording) => {
+                Ok(AppState::Recording {
+                    started_at: current_time,
+                })
+            }
+            (AppState::ProcessingComplete { .. }, AppEvent::ToggleRecording) => {
+                // Allow toggle recording from ProcessingComplete (same as StartRecording)
                 Ok(AppState::Recording {
                     started_at: current_time,
                 })
@@ -712,6 +729,17 @@ impl AppStateMachine {
         Ok(())
     }
 
+    /// Emit a custom event to the frontend
+    pub fn emit_event<T: serde::Serialize + Clone>(
+        &self,
+        event_name: &str,
+        payload: T,
+    ) -> Result<(), String> {
+        self.app_handle
+            .emit(event_name, payload)
+            .map_err(|e| format!("Failed to emit event '{}': {}", event_name, e))
+    }
+
     /// Static method to validate a transition (for testing)
     pub fn validate_transition_static(
         current_state: &AppState,
@@ -886,6 +914,17 @@ impl AppStateMachine {
                 transcript: original_transcript.clone(),
                 main_window_visible: true,
             }),
+            (
+                AppState::ProcessingGPTFormatting {
+                    original_transcript,
+                    ..
+                },
+                AppEvent::SkipFormattingToClipboard { transcript },
+            ) => Ok(AppState::ProcessingClipboard {
+                original_transcript: original_transcript.clone(),
+                text: transcript.clone(),
+                started_at: current_time,
+            }),
 
             (
                 AppState::ProcessingClipboard {
@@ -924,6 +963,12 @@ impl AppStateMachine {
                 })
             }
             (AppState::ProcessingComplete { .. }, AppEvent::StartRecording) => {
+                Ok(AppState::Recording {
+                    started_at: current_time,
+                })
+            }
+            (AppState::ProcessingComplete { .. }, AppEvent::ToggleRecording) => {
+                // Allow toggle recording from ProcessingComplete (same as StartRecording)
                 Ok(AppState::Recording {
                     started_at: current_time,
                 })

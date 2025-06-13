@@ -255,6 +255,25 @@ pub async fn stop_recording_and_process_to_clipboard(
         eprintln!("⚠️  Warning: Failed to emit transcription complete: {}", e);
     }
 
+    // Emit processing data updated event so frontend gets the transcript data
+    eprintln!("📊 [PROCESSING] Emitting processing-data-updated event with transcript");
+    let transcript_text = transcript.text.clone(); // Clone early to avoid borrowing issues
+    if let Some(state_machine) = state_machine_state.lock().await.as_ref() {
+        let state_machine_guard = state_machine.lock().await;
+        if let Err(e) = state_machine_guard.emit_event(
+            "processing-data-updated",
+            serde_json::json!({
+                "original_transcript": transcript_text.clone(),
+                "final_text": null,
+                "profile_id": active_profile_id
+            }),
+        ) {
+            eprintln!("⚠️  Warning: Failed to emit processing-data-updated: {}", e);
+        }
+    } else {
+        eprintln!("⚠️  Warning: State machine not available for processing-data-updated event");
+    }
+
     // 6. Apply GPT-4 formatting (conditional)
     eprintln!("🤖 Step 6: Checking for GPT-4 formatting...");
     let final_text = if let Some(profile) = profile_data {
@@ -265,7 +284,7 @@ pub async fn stop_recording_and_process_to_clipboard(
             // Skip GPT formatting and go directly to clipboard
             if let Err(e) = crate::commands::state_machine::process_event(
                 crate::state::AppEvent::SkipFormattingToClipboard {
-                    transcript: transcript.text.clone(),
+                    transcript: transcript_text.clone(),
                 },
                 &state_machine_state,
             )
@@ -274,7 +293,7 @@ pub async fn stop_recording_and_process_to_clipboard(
                 eprintln!("⚠️  Warning: Failed to emit skip formatting event: {}", e);
             }
 
-            transcript.text
+            transcript_text.clone()
         } else if profile.prompt.is_some() && !profile.prompt.as_ref().unwrap().is_empty() {
             // Use GPT-4 formatting
             eprintln!(
@@ -282,7 +301,7 @@ pub async fn stop_recording_and_process_to_clipboard(
                 profile.name
             );
             match format_text_with_gpt(
-                transcript.text.clone(),
+                transcript_text.clone(),
                 profile.prompt.unwrap_or_default(),
                 profile.example_input.unwrap_or_default(),
                 profile.example_output.unwrap_or_default(),
@@ -332,7 +351,7 @@ pub async fn stop_recording_and_process_to_clipboard(
                     // Still transition to clipboard with original text
                     if let Err(err) = crate::commands::state_machine::process_event(
                         crate::state::AppEvent::SkipFormattingToClipboard {
-                            transcript: transcript.text.clone(),
+                            transcript: transcript_text.clone(),
                         },
                         &state_machine_state,
                     )
@@ -344,7 +363,7 @@ pub async fn stop_recording_and_process_to_clipboard(
                         );
                     }
 
-                    transcript.text // Fallback to original
+                    transcript_text.clone() // Fallback to original
                 }
             }
         } else {
@@ -354,7 +373,7 @@ pub async fn stop_recording_and_process_to_clipboard(
             // Skip GPT formatting and go directly to clipboard
             if let Err(e) = crate::commands::state_machine::process_event(
                 crate::state::AppEvent::SkipFormattingToClipboard {
-                    transcript: transcript.text.clone(),
+                    transcript: transcript_text.clone(),
                 },
                 &state_machine_state,
             )
@@ -363,7 +382,7 @@ pub async fn stop_recording_and_process_to_clipboard(
                 eprintln!("⚠️  Warning: Failed to emit skip formatting event: {}", e);
             }
 
-            transcript.text
+            transcript_text.clone()
         }
     } else {
         // No profile selected - use original transcript
@@ -372,7 +391,7 @@ pub async fn stop_recording_and_process_to_clipboard(
         // Skip GPT formatting and go directly to clipboard
         if let Err(e) = crate::commands::state_machine::process_event(
             crate::state::AppEvent::SkipFormattingToClipboard {
-                transcript: transcript.text.clone(),
+                transcript: transcript_text.clone(),
             },
             &state_machine_state,
         )
@@ -381,12 +400,35 @@ pub async fn stop_recording_and_process_to_clipboard(
             eprintln!("⚠️  Warning: Failed to emit skip formatting event: {}", e);
         }
 
-        transcript.text
+        transcript_text.clone()
     };
     eprintln!(
         "✅ Step 6 complete: Final text ready ({} characters)",
         final_text.len()
     );
+
+    // Emit final processing data updated event with both transcript and final text
+    eprintln!("📊 [PROCESSING] Emitting final processing-data-updated event");
+    if let Some(state_machine) = state_machine_state.lock().await.as_ref() {
+        let state_machine_guard = state_machine.lock().await;
+        if let Err(e) = state_machine_guard.emit_event(
+            "processing-data-updated",
+            serde_json::json!({
+                "original_transcript": transcript_text.clone(),
+                "final_text": final_text.clone(),
+                "profile_id": active_profile_id
+            }),
+        ) {
+            eprintln!(
+                "⚠️  Warning: Failed to emit final processing-data-updated: {}",
+                e
+            );
+        }
+    } else {
+        eprintln!(
+            "⚠️  Warning: State machine not available for final processing-data-updated event"
+        );
+    }
 
     // 7. Copy processed text to clipboard
     eprintln!("📋 Step 7: Copying to clipboard...");
@@ -459,7 +501,7 @@ pub async fn stop_recording_and_process_to_clipboard(
         eprintln!("✅ Step 8 complete: Temporary file cleaned up");
     }
 
-    // 9. Transition to processing complete state first (for success toast)
+    // 9. Transition to processing complete state (stay here for reformatting)
     eprintln!("🎯 [PROCESSING] Step 9: Transitioning to processing complete state...");
     if let Err(e) = crate::commands::state_machine::process_event(
         crate::state::AppEvent::ClipboardCopyComplete,
@@ -475,25 +517,276 @@ pub async fn stop_recording_and_process_to_clipboard(
         eprintln!("✅ [PROCESSING] Step 9 complete: Transitioned to processing complete state");
     }
 
-    // 10. Brief delay to allow frontend to show success toast, then transition to idle
-    eprintln!(
-        "🎯 [PROCESSING] Step 10: Waiting briefly for success toast, then transitioning to idle..."
-    );
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    let success_msg = "Transcription copied to clipboard";
+    eprintln!("🎉 Workflow complete: {}", success_msg);
+    eprintln!("📊 [PROCESSING] Final state: ProcessingComplete - ready for reformatting with different profiles");
+    Ok(success_msg.to_string())
+}
 
+/// Reformat the completed text with a different profile
+/// This command is used when processing is complete and the user wants to reformat with a different profile
+#[tauri::command]
+pub async fn reformat_with_profile(
+    profile_id: String,
+    state_machine_state: tauri::State<'_, crate::state::AppStateMachineState>,
+    gpt_state: tauri::State<'_, GptClientState>,
+    clipboard_state: tauri::State<'_, ClipboardServiceState>,
+) -> Result<String, String> {
+    eprintln!(
+        "🔄 [REFORMAT] Starting reformat with profile: {}",
+        profile_id
+    );
+
+    // Get the current state to extract the original transcript
+    let original_transcript = {
+        if let Some(state_machine) = state_machine_state.lock().await.as_ref() {
+            let state_machine_guard = state_machine.lock().await;
+            match state_machine_guard.current_state() {
+                crate::state::recording_state_machine::AppState::ProcessingComplete {
+                    original_transcript,
+                    ..
+                } => original_transcript.clone(),
+                _ => {
+                    let error_msg = "Cannot reformat: not in ProcessingComplete state".to_string();
+                    eprintln!("❌ [REFORMAT] Error: {}", error_msg);
+                    return Err(error_msg);
+                }
+            }
+        } else {
+            let error_msg = "State machine not available".to_string();
+            eprintln!("❌ [REFORMAT] Error: {}", error_msg);
+            return Err(error_msg);
+        }
+    };
+
+    eprintln!(
+        "📝 [REFORMAT] Original transcript: {} characters",
+        original_transcript.len()
+    );
+
+    // Emit ReformatWithProfile event to transition state
     if let Err(e) = crate::commands::state_machine::process_event(
-        crate::state::AppEvent::Reset,
+        crate::state::AppEvent::ReformatWithProfile {
+            profile_id: profile_id.clone(),
+        },
         &state_machine_state,
     )
     .await
     {
-        eprintln!("⚠️  Warning: Failed to transition back to idle: {}", e);
-    } else {
-        eprintln!("✅ [PROCESSING] Step 10 complete: Transitioned back to idle state");
+        let error_msg = format!("Failed to start reformat: {}", e);
+        eprintln!("❌ [REFORMAT] Error: {}", error_msg);
+        return Err(error_msg);
     }
 
-    let success_msg = "Transcription copied to clipboard";
-    eprintln!("🎉 Workflow complete: {}", success_msg);
-    eprintln!("📊 [PROCESSING] Final state should now be Idle with processing complete");
-    Ok(success_msg.to_string())
+    // Load the selected profile
+    eprintln!("💭 [REFORMAT] Loading profile data for: {}", profile_id);
+    let profile = match load_profiles().await {
+        Ok(profile_collection) => {
+            let engine = ProfileEngine::new();
+            match engine.find_profile_by_id(&profile_collection, &profile_id) {
+                Ok(profile) => Some(profile.clone()),
+                Err(e) => {
+                    eprintln!("⚠️  [REFORMAT] Warning: Profile not found: {}", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("⚠️  [REFORMAT] Warning: Failed to load profiles: {}", e);
+            None
+        }
+    };
+
+    // Apply formatting based on profile
+    let final_text = if let Some(profile) = profile {
+        if profile.id == "1" {
+            // Profile 1 = clipboard profile - no GPT-4 formatting
+            eprintln!("ℹ️  [REFORMAT] Using clipboard profile (ID: 1) - skipping GPT-4 formatting");
+
+            // Skip GPT formatting and go directly to clipboard
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::SkipFormattingToClipboard {
+                    transcript: original_transcript.clone(),
+                },
+                &state_machine_state,
+            )
+            .await
+            {
+                eprintln!(
+                    "⚠️  [REFORMAT] Warning: Failed to emit skip formatting event: {}",
+                    e
+                );
+            }
+
+            original_transcript.clone()
+        } else if profile.prompt.is_some() && !profile.prompt.as_ref().unwrap().is_empty() {
+            // Use GPT-4 formatting
+            eprintln!(
+                "🧠 [REFORMAT] Applying GPT-4 formatting with profile: {}",
+                profile.name
+            );
+            match format_text_with_gpt(
+                original_transcript.clone(),
+                profile.prompt.unwrap_or_default(),
+                profile.example_input.unwrap_or_default(),
+                profile.example_output.unwrap_or_default(),
+                gpt_state,
+            )
+            .await
+            {
+                Ok(formatted) => {
+                    eprintln!("✅ [REFORMAT] GPT-4 formatting successful");
+
+                    // Emit GPT formatting complete
+                    if let Err(e) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::GPTFormattingComplete {
+                            formatted_text: formatted.clone(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!(
+                            "⚠️  [REFORMAT] Warning: Failed to emit GPT formatting complete: {}",
+                            e
+                        );
+                    }
+
+                    formatted
+                }
+                Err(e) => {
+                    eprintln!(
+                        "⚠️  [REFORMAT] GPT-4 formatting failed, using original transcript: {}",
+                        e
+                    );
+
+                    // Emit GPT formatting error but continue with original transcript
+                    if let Err(err) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::GPTFormattingError {
+                            error: e.to_string(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!(
+                            "⚠️  [REFORMAT] Warning: Failed to emit GPT formatting error: {}",
+                            err
+                        );
+                    }
+
+                    // Still transition to clipboard with original text
+                    if let Err(err) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::SkipFormattingToClipboard {
+                            transcript: original_transcript.clone(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!("⚠️  [REFORMAT] Warning: Failed to emit skip formatting after error: {}", err);
+                    }
+
+                    original_transcript.clone()
+                }
+            }
+        } else {
+            // Profile has no prompt - use original transcript
+            eprintln!("ℹ️  [REFORMAT] Profile has no prompt - using original transcript");
+
+            // Skip GPT formatting and go directly to clipboard
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::SkipFormattingToClipboard {
+                    transcript: original_transcript.clone(),
+                },
+                &state_machine_state,
+            )
+            .await
+            {
+                eprintln!(
+                    "⚠️  [REFORMAT] Warning: Failed to emit skip formatting event: {}",
+                    e
+                );
+            }
+
+            original_transcript.clone()
+        }
+    } else {
+        eprintln!("ℹ️  [REFORMAT] Profile not found - using original transcript");
+
+        // Skip GPT formatting and go directly to clipboard
+        if let Err(e) = crate::commands::state_machine::process_event(
+            crate::state::AppEvent::SkipFormattingToClipboard {
+                transcript: original_transcript.clone(),
+            },
+            &state_machine_state,
+        )
+        .await
+        {
+            eprintln!(
+                "⚠️  [REFORMAT] Warning: Failed to emit skip formatting event: {}",
+                e
+            );
+        }
+
+        original_transcript.clone()
+    };
+
+    eprintln!("📋 [REFORMAT] Copying reformatted text to clipboard...");
+
+    // Copy to clipboard
+    {
+        let clipboard_guard = clipboard_state.lock().await;
+        if let Some(ref clipboard) = *clipboard_guard {
+            match clipboard.copy(&final_text).await {
+                Ok(_) => {
+                    eprintln!("✅ [REFORMAT] Text copied to clipboard successfully");
+
+                    // Emit clipboard copy complete
+                    if let Err(e) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::ClipboardCopyComplete,
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!(
+                            "⚠️  [REFORMAT] Warning: Failed to emit clipboard copy complete: {}",
+                            e
+                        );
+                    }
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to copy to clipboard: {}", e);
+                    eprintln!("❌ [REFORMAT] Error: {}", error_msg);
+
+                    // Emit clipboard error
+                    if let Err(err) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::ClipboardError {
+                            error: error_msg.clone(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!(
+                            "⚠️  [REFORMAT] Warning: Failed to emit clipboard error: {}",
+                            err
+                        );
+                    }
+
+                    return Err(error_msg);
+                }
+            }
+        } else {
+            let error_msg = "Clipboard service not initialized";
+            eprintln!("❌ [REFORMAT] Error: {}", error_msg);
+            return Err(error_msg.to_string());
+        }
+    }
+
+    eprintln!(
+        "✅ [REFORMAT] Reformat completed successfully with profile: {}",
+        profile_id
+    );
+    Ok(format!("Text reformatted with profile: {}", profile_id))
 }

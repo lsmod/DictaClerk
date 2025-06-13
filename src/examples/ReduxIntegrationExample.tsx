@@ -30,7 +30,8 @@ export const RecordingButton: React.FC = () => {
   const { startRecording, stopRecording } = useBackendCommands()
 
   const isRecording = status === 'recording'
-  const isProcessing = status.startsWith('processing')
+  const isProcessing =
+    status.startsWith('processing') && status !== 'processing-complete'
 
   return (
     <div className="flex items-center gap-4">

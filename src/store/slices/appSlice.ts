@@ -496,7 +496,10 @@ export const selectIsRecording = (state: { app: AppState }): boolean => {
 }
 
 export const selectIsProcessing = (state: { app: AppState }): boolean => {
-  return state.app.status.startsWith('processing')
+  return (
+    state.app.status.startsWith('processing') &&
+    state.app.status !== 'processing-complete'
+  )
 }
 
 export const selectHasErrors = (state: { app: AppState }): boolean => {

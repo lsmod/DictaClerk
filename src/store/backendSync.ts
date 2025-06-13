@@ -95,7 +95,7 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
         final_text?: string
         profile_id?: string
       }>('processing-data-updated', (event) => {
-        console.log('Processing data updated:', event.payload)
+        console.log('📊 [BACKEND-SYNC] Processing data updated:', event.payload)
         dispatch(
           setProcessingData({
             originalTranscript: event.payload.original_transcript || null,
@@ -425,7 +425,7 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
     reformatWithProfile: async (profileId: string) => {
       try {
-        // This would need to be implemented with a specific backend command
+        // This command triggers reformat using the original transcript
         console.log('Reformat with profile via Redux:', profileId)
         await invoke('reformat_with_profile', { profileId })
         console.log('Text reformatted with profile:', profileId)
@@ -474,12 +474,15 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
         dispatch(setProfiles(profileData.profiles))
 
-        // Set active profile to default or first active profile
+        // Set active profile to clipboard profile (ID "1") first, then fallback to default or first active profile
+        const clipboardProfile = profileData.profiles.find((p) => p.id === '1')
         const defaultProfile = profileData.profiles.find(
           (p) => p.id === profileData.default_profile_id
         )
         const activeProfile =
-          defaultProfile || profileData.profiles.find((p) => p.active)
+          clipboardProfile ||
+          defaultProfile ||
+          profileData.profiles.find((p) => p.active)
 
         if (activeProfile) {
           dispatch(setActiveProfile(activeProfile.id))

@@ -23,7 +23,8 @@ export const useStopButtonViewModel = () => {
   const { startRecording, stopRecording } = useBackendCommands()
 
   const isRecording = status === 'recording'
-  const isProcessing = status.startsWith('processing')
+  const isProcessing =
+    status.startsWith('processing') && status !== 'processing-complete'
 
   // Listen to state machine events for better synchronization
   useEffect(() => {

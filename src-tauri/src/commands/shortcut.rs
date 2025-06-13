@@ -189,9 +189,16 @@ pub async fn toggle_record_with_tray(
 
     // Handle recording toggle based on current state machine state
     match current_state {
-        crate::state::AppState::Idle { .. } => {
-            // Start recording
-            println!("🎙️ [SHORTCUT] Starting recording from Idle state...");
+        crate::state::AppState::Idle { .. } | crate::state::AppState::ProcessingComplete { .. } => {
+            // Start recording (from Idle or ProcessingComplete state)
+            println!(
+                "🎙️ [SHORTCUT] Starting recording from {:?} state...",
+                if matches!(current_state, crate::state::AppState::Idle { .. }) {
+                    "Idle"
+                } else {
+                    "ProcessingComplete"
+                }
+            );
 
             // Process start recording event through state machine
             if let Err(e) = crate::commands::state_machine::process_event(
@@ -262,7 +269,7 @@ pub async fn toggle_record_with_tray(
             }
         }
         _ => {
-            // In processing or other states - ignore toggle
+            // In actual processing states (not ProcessingComplete) - ignore toggle
             println!("⏸️ [SHORTCUT] In processing state - ignoring toggle recording");
             Ok("Recording toggle ignored - app is processing".to_string())
         }

@@ -82,7 +82,8 @@ describe('ElapsedTime Component Logic', () => {
       })
 
       const { status } = mockUseAppSelector()
-      const isProcessing = status.startsWith('processing')
+      const isProcessing =
+        status.startsWith('processing') && status !== 'processing-complete'
 
       expect(isProcessing).toBe(true)
     })

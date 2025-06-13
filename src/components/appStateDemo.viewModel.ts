@@ -66,7 +66,9 @@ export const useAppStateDemoViewModel = () => {
   const canStartRecording =
     appState.status === 'idle' || appState.status === 'processing-complete'
   const canStopRecording = appState.status === 'recording'
-  const canCancelRecording = appState.status.startsWith('processing')
+  const canCancelRecording =
+    appState.status.startsWith('processing') &&
+    appState.status !== 'processing-complete'
   const showProcessingData = Boolean(
     appState.originalTranscript || appState.finalText
   )

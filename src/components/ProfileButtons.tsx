@@ -9,7 +9,7 @@ import { useProfileButtonsViewModel } from './profileButtons.viewModel'
 import { Profile } from '@/store/slices/appSlice'
 
 const ProfileButtons: React.FC = () => {
-  const { state, actions, onMount } = useProfileButtonsViewModel()
+  const { state, actions, onMount, canReformat } = useProfileButtonsViewModel()
 
   useEffect(onMount, [])
 
@@ -68,7 +68,12 @@ const ProfileButtons: React.FC = () => {
         <div
           className="profile-buttons"
           role="radiogroup"
-          aria-label="Profile selection"
+          aria-label={
+            canReformat
+              ? 'Profile selection for reformatting'
+              : 'Profile selection'
+          }
+          data-processing-complete={canReformat}
         >
           {state.visibleProfiles.slice(0, 5).map((profile) => (
             <Tooltip key={profile.id}>
@@ -83,7 +88,9 @@ const ProfileButtons: React.FC = () => {
                   onKeyDown={(e) => actions.handleKeyDown(e, profile.id)}
                   role="radio"
                   aria-checked={profile.id === state.activeProfileId}
-                  aria-label={`${profile.name} profile`}
+                  aria-label={`${profile.name} profile${
+                    canReformat ? ' - click to reformat' : ''
+                  }`}
                   aria-describedby={`profile-${profile.id}-description`}
                 >
                   <ProfileButtonContent profile={profile} />
@@ -93,6 +100,13 @@ const ProfileButtons: React.FC = () => {
                 <div>
                   <strong>{profile.name}</strong>
                   {profile.description && <p>{profile.description}</p>}
+                  {canReformat && (
+                    <p className="text-sm text-blue-400 mt-1">
+                      {actions.isClipboardProfile(profile.id)
+                        ? 'Click to copy original transcript'
+                        : 'Click to reformat with this profile'}
+                    </p>
+                  )}
                 </div>
                 <div
                   id={`profile-${profile.id}-description`}
@@ -103,6 +117,13 @@ const ProfileButtons: React.FC = () => {
                     : `Custom profile: ${
                         profile.description || 'No description'
                       }`}
+                  {canReformat && (
+                    <span>
+                      {actions.isClipboardProfile(profile.id)
+                        ? '. Click to copy original transcript to clipboard.'
+                        : '. Click to reformat the transcript with this profile.'}
+                    </span>
+                  )}
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -114,10 +135,11 @@ const ProfileButtons: React.FC = () => {
           }).map((_, index) => (
             <div
               key={`placeholder-${index}`}
-              className="profile-button placeholder"
+              className="profile-button"
+              style={{ opacity: 0.3 }}
               aria-hidden="true"
             >
-              {state.visibleProfiles.length + index + 1}
+              {index + 1}
             </div>
           ))}
         </div>

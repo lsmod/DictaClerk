@@ -16,17 +16,18 @@ use commands::{
     init_state_machine, init_system_tray, init_whisper_client, is_app_processing, is_app_recording,
     is_clipboard_initialized, is_gpt_initialized, is_recording, is_settings_window_open,
     is_whisper_initialized, is_window_hidden, load_profiles, load_settings, open_settings_window,
-    register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
-    reset_app_state_via_state_machine, retry_backend_connection, save_profiles, save_settings,
-    select_profile, settings::ensure_default_configs, should_main_window_be_visible,
-    show_main_window, show_window_and_start_recording, start_capture,
-    start_recording_via_state_machine, stop_capture, stop_recording_and_process_to_clipboard,
-    stop_recording_via_state_machine, subscribe_rms, test_api_key, toggle_main_window,
-    toggle_record, toggle_record_with_tray, transcribe_audio, transcribe_recorded_audio,
-    unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
-    update_global_shortcut, update_tray_global_shortcut, update_tray_status, v1_save_profiles,
-    v1_save_settings, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
-    GptClientState, ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
+    reformat_with_profile, register_all_profile_shortcuts, register_global_shortcut,
+    register_profile_shortcut, reset_app_state_via_state_machine, retry_backend_connection,
+    save_profiles, save_settings, select_profile, settings::ensure_default_configs,
+    should_main_window_be_visible, show_main_window, show_window_and_start_recording,
+    start_capture, start_recording_via_state_machine, stop_capture,
+    stop_recording_and_process_to_clipboard, stop_recording_via_state_machine, subscribe_rms,
+    test_api_key, toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
+    transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
+    unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
+    update_tray_status, v1_save_profiles, v1_save_settings, validate_shortcut_conflict,
+    AudioCaptureState, ClipboardServiceState, GptClientState, ProfileAppState, ShortcutMgrState,
+    SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
 use state::{AppStateMachineBuilder, AppStateMachineState};
@@ -285,7 +286,8 @@ pub fn run() {
             get_error_state,
             reset_app_state_via_state_machine,
             retry_backend_connection,
-            test_api_key
+            test_api_key,
+            reformat_with_profile
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
