@@ -56,10 +56,37 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
   // Listen to backend state machine events
   const setupEventListeners = async () => {
     try {
-      // Listen for state changes
+      console.log('🔄 [BACKEND-SYNC] Setting up backend event listeners...')
+
+      // Listen for backend state changes
       await listen<BackendStateEvent>('app-state-changed', (event) => {
-        console.log('Backend state changed:', event.payload)
-        dispatch(backendStateChanged(event.payload))
+        console.log('📡 [BACKEND-SYNC] Backend state changed:', event.payload)
+
+        // Add detailed logging about the state transition
+        const payload = event.payload
+        console.log('🔍 [BACKEND-SYNC] State transition details:', {
+          from: payload.previous_state,
+          to: payload.current_state,
+          event: payload.event,
+          timestamp: payload.timestamp,
+          context: payload.context,
+        })
+
+        // Check if we're transitioning to processing states
+        if (payload.current_state.includes('Processing')) {
+          console.log(
+            '🔄 [BACKEND-SYNC] ✨ PROCESSING STATE DETECTED:',
+            payload.current_state
+          )
+          console.log('📊 [BACKEND-SYNC] Processing context:', payload.context)
+        }
+
+        // Check if processing progress should be updated
+        if (payload.context.is_processing) {
+          console.log('🔄 [BACKEND-SYNC] Processing progress should be tracked')
+        }
+
+        dispatch(backendStateChanged(payload))
       })
 
       // Listen for processing data updates
@@ -83,8 +110,8 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
         stage: string
         progress: number
         message?: string
-      }>('processing-progress', (event) => {
-        console.log('Processing progress:', event.payload)
+      }>('processing-progress-updated', (event) => {
+        console.log('Processing progress updated:', event.payload)
         const progress: ProcessingProgress = {
           stage: event.payload.stage as ProcessingProgress['stage'],
           progress: event.payload.progress,
@@ -147,7 +174,10 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
       // Listen for window state updates
       await listen<{
-        main_window?: { visible: boolean; position?: { x: number; y: number } }
+        main_window?: {
+          visible: boolean
+          position?: { x: number; y: number }
+        }
         settings_window?: { visible: boolean }
         profile_editor_window?: {
           visible: boolean
@@ -216,6 +246,8 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
         dispatch(setBackendConnected(false))
         // The actual reconnection will be handled by re-establishing listeners
       })
+
+      console.log('Backend sync event listeners set up successfully')
 
       dispatch(setBackendConnected(true))
       console.log('Backend event listeners setup successfully')
@@ -298,12 +330,27 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
     stopRecording: async () => {
       try {
-        console.log('🛑 Stopping recording via state machine...')
+        console.log('🛑 [STOP-BUTTON] Stopping recording via state machine...')
+        console.log(
+          '🔍 [STOP-BUTTON] About to call stop_recording_and_process_to_clipboard'
+        )
+        console.time('stop-recording-process')
+
         // Use comprehensive stop and process command
-        await invoke('stop_recording_and_process_to_clipboard')
-        console.log('✅ Recording stopped and processed via state machine')
+        const result = await invoke('stop_recording_and_process_to_clipboard')
+
+        console.timeEnd('stop-recording-process')
+        console.log(
+          '✅ [STOP-BUTTON] Recording stopped and processed via state machine:',
+          result
+        )
       } catch (error) {
-        console.error('❌ Failed to stop recording:', error)
+        console.error('❌ [STOP-BUTTON] Failed to stop recording:', error)
+        console.error('❌ [STOP-BUTTON] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : 'No stack trace',
+          errorString: String(error),
+        })
         const detailedError: AppError = {
           type: 'system',
           message: `Failed to stop recording: ${error}`,
@@ -312,6 +359,7 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
           context: { operation: 'stop_recording', error: String(error) },
         }
         dispatch(addError(detailedError))
+        throw error // Re-throw to let caller handle if needed
       }
     },
 

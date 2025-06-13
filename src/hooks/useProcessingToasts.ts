@@ -12,28 +12,50 @@ export const useProcessingToasts = () => {
   )
   const processingToastRef = useRef<string | number | null>(null)
   const errorToastRef = useRef<string | number | null>(null)
+  const wasProcessingRef = useRef<boolean>(false)
 
   // Handle processing state toasts
   useEffect(() => {
     const isProcessing = status.startsWith('processing')
 
+    console.log('🍞 [TOAST] Processing state check:', {
+      status,
+      isProcessing,
+      wasProcessing: wasProcessingRef.current,
+      hasProcessingToast: !!processingToastRef.current,
+    })
+
     if (isProcessing && !processingToastRef.current) {
       // Show processing toast
+      console.log('🍞 [TOAST] Showing processing toast')
+      wasProcessingRef.current = true
       processingToastRef.current = toast.loading('Processing recording...', {
         description: 'Transcribing and formatting your audio',
         duration: Infinity, // Keep until processing is done
       })
     } else if (!isProcessing && processingToastRef.current) {
       // Dismiss processing toast when done
+      console.log('🍞 [TOAST] Dismissing processing toast, status:', status)
       toast.dismiss(processingToastRef.current)
       processingToastRef.current = null
 
       // Show success toast if processing completed successfully
       if (status === 'processing-complete') {
+        console.log('🍞 [TOAST] ✅ Showing success toast!')
         toast.success('Recording processed successfully!', {
           description: 'Text has been copied to clipboard',
-          duration: 3000,
+          duration: 4000, // Show a bit longer for better UX
         })
+        wasProcessingRef.current = false
+      } else if (status === 'idle' && wasProcessingRef.current) {
+        console.log('🍞 [TOAST] ℹ️ Processing completed, transitioned to idle')
+        // Also show success toast when transitioning to idle after processing
+        // This handles cases where we go directly from processing to idle
+        toast.success('Recording processed successfully!', {
+          description: 'Text has been copied to clipboard',
+          duration: 4000,
+        })
+        wasProcessingRef.current = false
       }
     }
 

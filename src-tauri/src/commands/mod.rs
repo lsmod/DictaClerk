@@ -69,32 +69,67 @@ pub async fn stop_recording_and_process_to_clipboard(
     clipboard_state: State<'_, ClipboardServiceState>,
     profile_state: State<'_, ProfileAppState>,
     gpt_state: State<'_, GptClientState>,
+    state_machine_state: State<'_, crate::state::AppStateMachineState>,
 ) -> Result<String, String> {
-    eprintln!("🔄 Starting complete workflow...");
+    eprintln!("🔄 [PROCESSING] Starting complete workflow...");
+    eprintln!(
+        "📊 [PROCESSING] Function called from: {}",
+        std::backtrace::Backtrace::force_capture()
+    );
 
     // 1. Stop recording and get WAV file path
-    eprintln!("📱 Step 1: Stopping recording...");
+    eprintln!("📱 [PROCESSING] Step 1: Stopping recording...");
+
+    // Emit state transition to ProcessingTranscription
+    if let Err(e) = crate::commands::state_machine::process_event(
+        crate::state::AppEvent::StopRecording,
+        &state_machine_state,
+    )
+    .await
+    {
+        eprintln!(
+            "⚠️  Warning: Failed to transition to processing state: {}",
+            e
+        );
+    }
+
     let wav_path = {
         let audio_guard = audio_state.lock().await;
         if let Some(ref capture) = *audio_guard {
             if !capture.is_recording() {
                 let error_msg = "Not currently recording";
-                eprintln!("❌ Error: {}", error_msg);
+                eprintln!("❌ [PROCESSING] Error: {}", error_msg);
+
+                // Emit error state
+                if let Err(e) = crate::commands::state_machine::process_event(
+                    crate::state::AppEvent::TranscriptionError {
+                        error: error_msg.to_string(),
+                    },
+                    &state_machine_state,
+                )
+                .await
+                {
+                    eprintln!("⚠️  Warning: Failed to emit error state: {}", e);
+                }
+
                 return Err(error_msg.to_string());
             }
-            eprintln!("🛑 Stopping audio capture...");
+            eprintln!("🛑 [PROCESSING] Stopping audio capture...");
             capture.stop_capture().await.map_err(|e| {
                 let error_msg = format!("Failed to stop recording: {}", e);
-                eprintln!("❌ Error: {}", error_msg);
+                eprintln!("❌ [PROCESSING] Error: {}", error_msg);
                 error_msg
             })?
         } else {
             let error_msg = "Audio capture not initialized";
-            eprintln!("❌ Error: {}", error_msg);
+            eprintln!("❌ [PROCESSING] Error: {}", error_msg);
             return Err(error_msg.to_string());
         }
     };
-    eprintln!("✅ Step 1 complete: WAV file saved to {:?}", wav_path);
+    eprintln!(
+        "✅ [PROCESSING] Step 1 complete: WAV file saved to {:?}",
+        wav_path
+    );
 
     // Debug: Additional WAV file information
     match tokio::fs::metadata(&wav_path).await {
@@ -176,21 +211,49 @@ pub async fn stop_recording_and_process_to_clipboard(
 
     // 5. Transcribe the WAV file using Whisper
     eprintln!("🎙️  Step 5: Transcribing audio...");
-    let transcript = transcribe_recorded_audio(
+    let transcript = match transcribe_recorded_audio(
         wav_path.to_string_lossy().to_string(),
         prompt,
         whisper_state,
     )
     .await
-    .map_err(|e| {
-        let error_msg = format!("Transcription failed: {}", e);
-        eprintln!("❌ Error: {}", error_msg);
-        error_msg
-    })?;
+    {
+        Ok(transcript) => transcript,
+        Err(e) => {
+            let error_msg = format!("Transcription failed: {}", e);
+            eprintln!("❌ Error: {}", error_msg);
+
+            // Emit transcription error state
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::TranscriptionError {
+                    error: error_msg.clone(),
+                },
+                &state_machine_state,
+            )
+            .await
+            {
+                eprintln!("⚠️  Warning: Failed to emit transcription error: {}", e);
+            }
+
+            return Err(error_msg);
+        }
+    };
     eprintln!(
         "✅ Step 5 complete: Transcribed {} characters",
         transcript.text.len()
     );
+
+    // Emit transcription complete event
+    if let Err(e) = crate::commands::state_machine::process_event(
+        crate::state::AppEvent::TranscriptionComplete {
+            transcript: transcript.text.clone(),
+        },
+        &state_machine_state,
+    )
+    .await
+    {
+        eprintln!("⚠️  Warning: Failed to emit transcription complete: {}", e);
+    }
 
     // 6. Apply GPT-4 formatting (conditional)
     eprintln!("🤖 Step 6: Checking for GPT-4 formatting...");
@@ -198,6 +261,19 @@ pub async fn stop_recording_and_process_to_clipboard(
         if profile.id == "1" {
             // Profile 1 = clipboard profile - no GPT-4 formatting
             eprintln!("ℹ️  Using clipboard profile (ID: 1) - skipping GPT-4 formatting");
+
+            // Skip GPT formatting and go directly to clipboard
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::SkipFormattingToClipboard {
+                    transcript: transcript.text.clone(),
+                },
+                &state_machine_state,
+            )
+            .await
+            {
+                eprintln!("⚠️  Warning: Failed to emit skip formatting event: {}", e);
+            }
+
             transcript.text
         } else if profile.prompt.is_some() && !profile.prompt.as_ref().unwrap().is_empty() {
             // Use GPT-4 formatting
@@ -220,6 +296,19 @@ pub async fn stop_recording_and_process_to_clipboard(
                         "🔍 GPT-4 formatted text: {}",
                         &formatted.chars().take(100).collect::<String>()
                     );
+
+                    // Emit GPT formatting complete
+                    if let Err(e) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::GPTFormattingComplete {
+                            formatted_text: formatted.clone(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!("⚠️  Warning: Failed to emit GPT formatting complete: {}", e);
+                    }
+
                     formatted
                 }
                 Err(e) => {
@@ -227,17 +316,71 @@ pub async fn stop_recording_and_process_to_clipboard(
                         "⚠️  GPT-4 formatting failed, using original transcript: {}",
                         e
                     );
+
+                    // Emit GPT formatting error but continue with original transcript
+                    if let Err(err) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::GPTFormattingError {
+                            error: e.to_string(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!("⚠️  Warning: Failed to emit GPT formatting error: {}", err);
+                    }
+
+                    // Still transition to clipboard with original text
+                    if let Err(err) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::SkipFormattingToClipboard {
+                            transcript: transcript.text.clone(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!(
+                            "⚠️  Warning: Failed to emit skip formatting after error: {}",
+                            err
+                        );
+                    }
+
                     transcript.text // Fallback to original
                 }
             }
         } else {
             // Profile has no prompt - use original transcript
             eprintln!("ℹ️  Profile has no prompt - using original transcript");
+
+            // Skip GPT formatting and go directly to clipboard
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::SkipFormattingToClipboard {
+                    transcript: transcript.text.clone(),
+                },
+                &state_machine_state,
+            )
+            .await
+            {
+                eprintln!("⚠️  Warning: Failed to emit skip formatting event: {}", e);
+            }
+
             transcript.text
         }
     } else {
         // No profile selected - use original transcript
         eprintln!("ℹ️  No profile selected - using original transcript");
+
+        // Skip GPT formatting and go directly to clipboard
+        if let Err(e) = crate::commands::state_machine::process_event(
+            crate::state::AppEvent::SkipFormattingToClipboard {
+                transcript: transcript.text.clone(),
+            },
+            &state_machine_state,
+        )
+        .await
+        {
+            eprintln!("⚠️  Warning: Failed to emit skip formatting event: {}", e);
+        }
+
         transcript.text
     };
     eprintln!(
@@ -276,12 +419,30 @@ pub async fn stop_recording_and_process_to_clipboard(
         let clipboard_guard = clipboard_state.lock().await;
         if let Some(ref clipboard) = *clipboard_guard {
             eprintln!("   📋 Attempting clipboard copy...");
-            clipboard.copy(&final_text).await.map_err(|e| {
-                let error_msg = format!("Failed to copy to clipboard: {}", e);
-                eprintln!("❌ Error: {}", error_msg);
-                error_msg
-            })?;
-            eprintln!("   ✅ Clipboard copy operation completed successfully");
+            match clipboard.copy(&final_text).await {
+                Ok(_) => {
+                    eprintln!("   ✅ Clipboard copy operation completed successfully");
+                    // Note: ClipboardCopyComplete event will be emitted after cleanup
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to copy to clipboard: {}", e);
+                    eprintln!("❌ Error: {}", error_msg);
+
+                    // Emit clipboard error
+                    if let Err(err) = crate::commands::state_machine::process_event(
+                        crate::state::AppEvent::ClipboardError {
+                            error: error_msg.clone(),
+                        },
+                        &state_machine_state,
+                    )
+                    .await
+                    {
+                        eprintln!("⚠️  Warning: Failed to emit clipboard error: {}", err);
+                    }
+
+                    return Err(error_msg);
+                }
+            }
         } else {
             let error_msg = "Clipboard service not initialized";
             eprintln!("❌ Error: {}", error_msg);
@@ -298,7 +459,41 @@ pub async fn stop_recording_and_process_to_clipboard(
         eprintln!("✅ Step 8 complete: Temporary file cleaned up");
     }
 
+    // 9. Transition to processing complete state first (for success toast)
+    eprintln!("🎯 [PROCESSING] Step 9: Transitioning to processing complete state...");
+    if let Err(e) = crate::commands::state_machine::process_event(
+        crate::state::AppEvent::ClipboardCopyComplete,
+        &state_machine_state,
+    )
+    .await
+    {
+        eprintln!(
+            "⚠️  Warning: Failed to transition to processing complete: {}",
+            e
+        );
+    } else {
+        eprintln!("✅ [PROCESSING] Step 9 complete: Transitioned to processing complete state");
+    }
+
+    // 10. Brief delay to allow frontend to show success toast, then transition to idle
+    eprintln!(
+        "🎯 [PROCESSING] Step 10: Waiting briefly for success toast, then transitioning to idle..."
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+    if let Err(e) = crate::commands::state_machine::process_event(
+        crate::state::AppEvent::Reset,
+        &state_machine_state,
+    )
+    .await
+    {
+        eprintln!("⚠️  Warning: Failed to transition back to idle: {}", e);
+    } else {
+        eprintln!("✅ [PROCESSING] Step 10 complete: Transitioned back to idle state");
+    }
+
     let success_msg = "Transcription copied to clipboard";
     eprintln!("🎉 Workflow complete: {}", success_msg);
+    eprintln!("📊 [PROCESSING] Final state should now be Idle with processing complete");
     Ok(success_msg.to_string())
 }

@@ -108,13 +108,25 @@ export const useStopButtonViewModel = () => {
 
       if (isRecording) {
         console.log('🛑 [STOP-BUTTON] Calling stopRecording()...')
+        console.log('🕒 [STOP-BUTTON] Timestamp:', new Date().toISOString())
+        console.time('stop-recording-duration')
+
         await stopRecording()
-        console.log('✅ [STOP-BUTTON] stopRecording() completed')
+
+        console.timeEnd('stop-recording-duration')
+        console.log('✅ [STOP-BUTTON] stopRecording() completed successfully')
+        console.log('🔔 [STOP-BUTTON] About to announce recording state change')
         announceRecordingState(false)
       } else {
         console.log('🎙️ [STOP-BUTTON] Calling startRecording()...')
+        console.log('🕒 [STOP-BUTTON] Timestamp:', new Date().toISOString())
+        console.time('start-recording-duration')
+
         await startRecording()
-        console.log('✅ [STOP-BUTTON] startRecording() completed')
+
+        console.timeEnd('start-recording-duration')
+        console.log('✅ [STOP-BUTTON] startRecording() completed successfully')
+        console.log('🔔 [STOP-BUTTON] About to announce recording state change')
         announceRecordingState(true)
       }
 

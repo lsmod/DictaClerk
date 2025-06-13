@@ -3,6 +3,7 @@
 use crate::audio::capture::AudioCapture;
 use crate::commands::{AudioCaptureState, SystemTrayState};
 use crate::services::{ShortcutMgr, ShortcutMgrConfig};
+use crate::state::AppStateMachineState;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, State};
@@ -77,13 +78,19 @@ pub async fn auto_init_shortcut_mgr(
     init_shortcut_mgr(app_handle, None, state).await
 }
 
-/// Toggle recording state with system tray integration - this is called by the global shortcut
+/// Toggle recording state with tray icon update
+/// This is the command called by the global shortcut
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn toggle_record_with_tray(
     _app_handle: AppHandle,
-    state_machine_state: State<'_, crate::state::AppStateMachineState>,
+    state_machine_state: State<'_, AppStateMachineState>,
     tray_state: State<'_, SystemTrayState>,
     audio_state: State<'_, crate::commands::AudioCaptureState>,
+    whisper_state: State<'_, crate::commands::WhisperClientState>,
+    clipboard_state: State<'_, crate::commands::ClipboardServiceState>,
+    profile_state: State<'_, crate::commands::ProfileAppState>,
+    gpt_state: State<'_, crate::commands::GptClientState>,
 ) -> Result<String, String> {
     println!("🎯 [SHORTCUT] toggle_record_with_tray called");
 
@@ -226,20 +233,32 @@ pub async fn toggle_record_with_tray(
                 return Err(format!("Failed to process stop recording event: {}", e));
             }
 
-            // Actually stop the audio capture
-            let audio_guard = audio_state.lock().await;
-            if let Some(ref capture) = *audio_guard {
-                let path = capture
-                    .stop_capture()
-                    .await
-                    .map_err(|e| format!("Failed to stop audio capture: {}", e))?;
-                println!("✅ [SHORTCUT] Recording stopped successfully");
-                Ok(format!(
-                    "Recording stopped. File: {}",
-                    path.to_string_lossy()
-                ))
-            } else {
-                Err("Audio capture not initialized".to_string())
+            // Instead of just stopping audio capture, trigger the full processing workflow
+            println!("🔄 [SHORTCUT] Triggering full processing workflow...");
+            println!("🔍 [SHORTCUT] This should start transcription and processing");
+
+            // Call the same command that the stop button uses
+            match crate::commands::stop_recording_and_process_to_clipboard(
+                audio_state,
+                whisper_state,
+                clipboard_state,
+                profile_state,
+                gpt_state,
+                state_machine_state,
+            )
+            .await
+            {
+                Ok(result) => {
+                    println!(
+                        "✅ [SHORTCUT] Full processing workflow completed: {}",
+                        result
+                    );
+                    Ok(result)
+                }
+                Err(e) => {
+                    println!("❌ [SHORTCUT] Full processing workflow failed: {}", e);
+                    Err(e)
+                }
             }
         }
         _ => {

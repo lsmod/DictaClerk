@@ -51,18 +51,34 @@ fn setup_backend_event_listeners(app_handle: AppHandle) {
             match app_handle.try_state::<crate::state::AppStateMachineState>() {
                 Some(state_machine_state) => match app_handle.try_state::<SystemTrayState>() {
                     Some(tray_state) => match app_handle.try_state::<AudioCaptureState>() {
-                        Some(audio_state) => {
-                            if let Err(e) = toggle_record_with_tray(
-                                app_handle.clone(),
-                                state_machine_state,
-                                tray_state,
-                                audio_state,
-                            )
-                            .await
-                            {
-                                eprintln!("Failed to toggle recording from global shortcut: {}", e);
-                            }
-                        }
+                        Some(audio_state) => match app_handle.try_state::<WhisperClientState>() {
+                            Some(whisper_state) => match app_handle.try_state::<ClipboardServiceState>() {
+                                Some(clipboard_state) => match app_handle.try_state::<ProfileAppState>() {
+                                    Some(profile_state) => match app_handle.try_state::<GptClientState>() {
+                                        Some(gpt_state) => {
+                                            if let Err(e) = toggle_record_with_tray(
+                                                app_handle.clone(),
+                                                state_machine_state,
+                                                tray_state,
+                                                audio_state,
+                                                whisper_state,
+                                                clipboard_state,
+                                                profile_state,
+                                                gpt_state,
+                                            )
+                                            .await
+                                            {
+                                                eprintln!("Failed to toggle recording from global shortcut: {}", e);
+                                            }
+                                        }
+                                        None => eprintln!("GPT client state not found for global shortcut"),
+                                    },
+                                    None => eprintln!("Profile state not found for global shortcut"),
+                                },
+                                None => eprintln!("Clipboard service state not found for global shortcut"),
+                            },
+                            None => eprintln!("Whisper client state not found for global shortcut"),
+                        },
                         None => eprintln!("Audio capture state not found for global shortcut"),
                     },
                     None => eprintln!("System tray state not found for global shortcut"),
