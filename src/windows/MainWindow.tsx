@@ -5,7 +5,6 @@ import ProfileButtons from '../components/ProfileButtons'
 import ElapsedTime from '../components/ElapsedTime'
 import VolumeVisualizer from '../components/VolumeVisualizer'
 import SettingsButton from '../components/SettingsButton'
-import ErrorDisplay from '../components/ErrorDisplay'
 import { useMainWindowViewModel } from './mainWindow.viewModel'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -16,59 +15,79 @@ export default function MainWindow() {
 
   // Keyboard navigation handler
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Allow Escape to focus the record button for accessibility
+    // Allow Escape to focus the main interface
     if (e.key === 'Escape') {
-      const recordButton = document.querySelector(
-        '.record-stop-button'
-      ) as HTMLElement
-      if (recordButton) {
-        recordButton.focus()
+      const mainInterface = document.querySelector('.synth-interface')
+      if (mainInterface instanceof HTMLElement) {
+        mainInterface.focus()
+      }
+    }
+
+    // Space or Enter on main interface triggers record toggle
+    if ((e.key === ' ' || e.key === 'Enter') && e.target === e.currentTarget) {
+      e.preventDefault()
+      const recordButton = document.querySelector('.record-stop-toggle')
+      if (recordButton instanceof HTMLElement) {
+        recordButton.click()
       }
     }
   }
 
   return (
     <TooltipProvider>
+      {/* ARIA live region for announcements */}
       <div
+        id="main-live-region"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      />
+
+      <main
         className="synth-interface"
         data-tauri-drag-region
+        role="application"
+        aria-label="DictaClerk - Voice Recording Interface"
+        aria-describedby="main-description"
+        tabIndex={0}
         onKeyDown={handleKeyDown}
-        tabIndex={-1}
-        aria-label="DictaClerk main application window"
       >
-        {/* Live region for screen reader announcements */}
-        <div
-          id="main-live-region"
-          className="sr-only"
-          aria-live="polite"
-          aria-atomic="true"
-        />
-
-        {/* Error Display */}
-        <ErrorDisplay />
-
-        {/* Header with Settings */}
-        <div className="synth-header">
-          <SettingsButton />
+        {/* Hidden description for screen readers */}
+        <div id="main-description" className="sr-only">
+          Voice recording application. Use Space or Enter to start/stop
+          recording. Navigate with Tab to access settings and profile buttons.
+          Press Escape to return focus to main interface.
         </div>
 
-        {/* Main Controls Section */}
-        <div className="main-controls">
+        <header className="synth-header" role="banner">
+          <nav aria-label="Application settings">
+            <SettingsButton />
+          </nav>
+        </header>
+
+        <section
+          className="main-controls"
+          role="main"
+          aria-label="Recording controls"
+        >
           <div className="volume-section">
             <VolumeVisualizer />
             <ElapsedTime />
           </div>
           <RecordStopToggleButton />
-        </div>
+        </section>
 
-        {/* Profile Selection */}
-        <div className="profile-section">
+        <section
+          className="profile-section"
+          role="navigation"
+          aria-label="Profile selection"
+        >
           <ProfileButtons />
-        </div>
+        </section>
+      </main>
 
-        {/* Toast notifications */}
-        <Toaster />
-      </div>
+      {/* Toast notifications */}
+      <Toaster />
     </TooltipProvider>
   )
 }
