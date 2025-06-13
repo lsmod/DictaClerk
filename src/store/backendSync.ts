@@ -23,6 +23,7 @@ import {
   AppError,
   ProcessingProgress,
   WindowState,
+  clearErrors,
 } from './slices/appSlice'
 
 // Backend command interface
@@ -195,6 +196,27 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
         dispatch(setAutoRecoveryMode(event.payload.enabled))
       })
 
+      // Listen for error acknowledgment events from state machine
+      await listen('error-acknowledged', () => {
+        console.log('Error acknowledged by state machine')
+        dispatch(acknowledgeErrorAction())
+      })
+
+      // Listen for app state reset events from state machine
+      await listen('app-state-reset', () => {
+        console.log('App state reset by state machine')
+        // Clear all errors and reset to safe state
+        dispatch(clearErrors())
+        dispatch(setBackendConnected(true))
+      })
+
+      // Listen for backend connection retry events
+      await listen('backend-connection-retry', () => {
+        console.log('Backend connection retry initiated')
+        dispatch(setBackendConnected(false))
+        // The actual reconnection will be handled by re-establishing listeners
+      })
+
       dispatch(setBackendConnected(true))
       console.log('Backend event listeners setup successfully')
     } catch (error) {
@@ -296,12 +318,22 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
     acknowledgeError: async () => {
       try {
-        // Clear the error in Redux state
+        // Use new state machine-connected command for error acknowledgment
+        await invoke('acknowledge_error_via_state_machine')
+        console.log('Error acknowledged via state machine')
+
+        // Clear frontend error state
         dispatch(acknowledgeErrorAction())
-        console.log('Error acknowledged via Redux')
       } catch (error) {
         console.error('Failed to acknowledge error:', error)
-        dispatch(setError(`Failed to acknowledge error: ${error}`))
+        const detailedError: AppError = {
+          type: 'system',
+          message: `Failed to acknowledge error: ${error}`,
+          recoverable: true,
+          timestamp: Date.now(),
+          context: { operation: 'acknowledge_error', error: String(error) },
+        }
+        dispatch(addError(detailedError))
       }
     },
 
@@ -445,52 +477,76 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
         // Could dispatch an action to clear clipboard state if needed
       } catch (error) {
         console.error('Failed to clear clipboard history:', error)
-        dispatch(setError(`Failed to clear clipboard history: ${error}`))
+        const detailedError: AppError = {
+          type: 'system',
+          message: `Failed to clear clipboard history: ${error}`,
+          recoverable: true,
+          timestamp: Date.now(),
+          context: {
+            operation: 'clear_clipboard_history',
+            error: String(error),
+          },
+        }
+        dispatch(addError(detailedError))
       }
     },
 
     enableAutoRecovery: async () => {
       try {
-        // Instead of calling non-existent enable_auto_recovery command,
-        // just update the Redux state directly
-        dispatch(setAutoRecoveryMode(true))
-        console.log('Auto-recovery enabled via Redux')
+        // Use new state machine-connected command
+        await invoke('enable_auto_recovery_via_state_machine')
+        console.log('Auto-recovery enabled via state machine')
       } catch (error) {
         console.error('Failed to enable auto-recovery:', error)
-        dispatch(setError(`Failed to enable auto-recovery: ${error}`))
+        const detailedError: AppError = {
+          type: 'system',
+          message: `Failed to enable auto-recovery: ${error}`,
+          recoverable: true,
+          timestamp: Date.now(),
+          context: { operation: 'enable_auto_recovery', error: String(error) },
+        }
+        dispatch(addError(detailedError))
       }
     },
 
     disableAutoRecovery: async () => {
       try {
-        // Instead of calling non-existent disable_auto_recovery command,
-        // just update the Redux state directly
-        dispatch(setAutoRecoveryMode(false))
-        console.log('Auto-recovery disabled via Redux')
+        // Use new state machine-connected command
+        await invoke('disable_auto_recovery_via_state_machine')
+        console.log('Auto-recovery disabled via state machine')
       } catch (error) {
         console.error('Failed to disable auto-recovery:', error)
-        dispatch(setError(`Failed to disable auto-recovery: ${error}`))
+        const detailedError: AppError = {
+          type: 'system',
+          message: `Failed to disable auto-recovery: ${error}`,
+          recoverable: true,
+          timestamp: Date.now(),
+          context: { operation: 'disable_auto_recovery', error: String(error) },
+        }
+        dispatch(addError(detailedError))
       }
     },
 
     retryConnection: async () => {
       try {
-        // Instead of calling non-existent retry_backend_connection command,
-        // we'll implement a simple retry by re-establishing event listeners
-        console.log(
-          'Retrying backend connection by re-establishing listeners...'
-        )
+        // Use new state machine-connected command
+        console.log('Retrying backend connection via state machine...')
+        await invoke('retry_backend_connection')
 
-        // Clear any existing connection state
-        dispatch(setBackendConnected(false))
-
-        // Re-setup event listeners (which will also set connected to true)
+        // Re-setup event listeners after backend signals retry
         await setupEventListeners()
 
         console.log('Backend connection retry completed')
       } catch (error) {
         console.error('Failed to retry connection:', error)
-        dispatch(setError(`Failed to retry connection: ${error}`))
+        const detailedError: AppError = {
+          type: 'system',
+          message: `Failed to retry connection: ${error}`,
+          recoverable: true,
+          timestamp: Date.now(),
+          context: { operation: 'retry_connection', error: String(error) },
+        }
+        dispatch(addError(detailedError))
       }
     },
 
@@ -501,7 +557,14 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
         // Return empty history for now
       } catch (error) {
         console.error('Failed to get clipboard history:', error)
-        dispatch(setError(`Failed to get clipboard history: ${error}`))
+        const detailedError: AppError = {
+          type: 'system',
+          message: `Failed to get clipboard history: ${error}`,
+          recoverable: true,
+          timestamp: Date.now(),
+          context: { operation: 'get_clipboard_history', error: String(error) },
+        }
+        dispatch(addError(detailedError))
       }
     },
   }

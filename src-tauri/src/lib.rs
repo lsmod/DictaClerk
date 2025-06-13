@@ -6,25 +6,27 @@ pub mod state;
 pub mod utils;
 
 use commands::{
-    apply_profile_to_text, auto_init_shortcut_mgr, check_shortcut_available, close_settings_window,
-    copy_to_clipboard, encode_wav_to_ogg, format_text_with_gpt, get_active_profile,
-    get_clipboard_info, get_current_state, get_encoder_info, get_gpt_info, get_shortcut_status,
+    acknowledge_error_via_state_machine, apply_profile_to_text, auto_init_shortcut_mgr,
+    check_shortcut_available, close_settings_window, copy_to_clipboard,
+    disable_auto_recovery_via_state_machine, enable_auto_recovery_via_state_machine,
+    encode_wav_to_ogg, format_text_with_gpt, get_active_profile, get_clipboard_info,
+    get_current_state, get_encoder_info, get_error_state, get_gpt_info, get_shortcut_status,
     get_whisper_info, handle_window_close, has_modal_window_open, hide_main_window,
     init_audio_capture, init_clipboard_service, init_gpt_client, init_shortcut_mgr,
     init_state_machine, init_system_tray, init_whisper_client, is_app_processing, is_app_recording,
     is_clipboard_initialized, is_gpt_initialized, is_recording, is_settings_window_open,
     is_whisper_initialized, is_window_hidden, load_profiles, load_settings, open_settings_window,
     register_all_profile_shortcuts, register_global_shortcut, register_profile_shortcut,
-    save_profiles, save_settings, select_profile, settings::ensure_default_configs,
-    should_main_window_be_visible, show_main_window, show_window_and_start_recording,
-    start_capture, start_recording_via_state_machine, stop_capture,
-    stop_recording_and_process_to_clipboard, stop_recording_via_state_machine, subscribe_rms,
-    toggle_main_window, toggle_record, toggle_record_with_tray, transcribe_audio,
-    transcribe_recorded_audio, unregister_all_profile_shortcuts, unregister_global_shortcut,
-    unregister_profile_shortcut, update_global_shortcut, update_tray_global_shortcut,
-    update_tray_status, v1_save_profiles, v1_save_settings, validate_shortcut_conflict,
-    AudioCaptureState, ClipboardServiceState, GptClientState, ProfileAppState, ShortcutMgrState,
-    SystemTrayState, WhisperClientState,
+    reset_app_state_via_state_machine, retry_backend_connection, save_profiles, save_settings,
+    select_profile, settings::ensure_default_configs, should_main_window_be_visible,
+    show_main_window, show_window_and_start_recording, start_capture,
+    start_recording_via_state_machine, stop_capture, stop_recording_and_process_to_clipboard,
+    stop_recording_via_state_machine, subscribe_rms, toggle_main_window, toggle_record,
+    toggle_record_with_tray, transcribe_audio, transcribe_recorded_audio,
+    unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
+    update_global_shortcut, update_tray_global_shortcut, update_tray_status, v1_save_profiles,
+    v1_save_settings, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
+    GptClientState, ProfileAppState, ShortcutMgrState, SystemTrayState, WhisperClientState,
 };
 use config::validate_config_files;
 use state::{AppStateMachineBuilder, AppStateMachineState};
@@ -252,7 +254,13 @@ pub fn run() {
             should_main_window_be_visible,
             has_modal_window_open,
             start_recording_via_state_machine,
-            stop_recording_via_state_machine
+            stop_recording_via_state_machine,
+            acknowledge_error_via_state_machine,
+            disable_auto_recovery_via_state_machine,
+            enable_auto_recovery_via_state_machine,
+            get_error_state,
+            reset_app_state_via_state_machine,
+            retry_backend_connection
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

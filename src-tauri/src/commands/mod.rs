@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod clipboard;
 pub mod encoder;
+pub mod error_recovery;
 pub mod gpt;
 pub mod profiles;
 pub mod settings;
@@ -17,6 +18,11 @@ pub use clipboard::{
     ClipboardServiceState,
 };
 pub use encoder::{encode_wav_to_ogg, get_encoder_info};
+pub use error_recovery::{
+    acknowledge_error_via_state_machine, disable_auto_recovery_via_state_machine,
+    enable_auto_recovery_via_state_machine, get_error_state, reset_app_state_via_state_machine,
+    retry_backend_connection,
+};
 pub use gpt::{
     format_text_with_gpt, get_gpt_info, init_gpt_client, is_gpt_initialized, GptClientState,
 };

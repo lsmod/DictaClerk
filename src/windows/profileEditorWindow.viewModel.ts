@@ -22,26 +22,21 @@ export function useProfileEditorWindowViewModel() {
     invoke('close_profile_editor_window').catch(console.error)
   }, [])
 
-  const handleProfileEditorEvents = useCallback(() => {
-    // Profile editor window specific logic can be added here
-    console.log('Profile editor window mounted')
-  }, [])
-
-  const setupEventListeners = useCallback(() => {
-    window.addEventListener('profile-editor-events', handleProfileEditorEvents)
-
-    return () => {
-      window.removeEventListener(
-        'profile-editor-events',
-        handleProfileEditorEvents
-      )
-    }
-  }, [handleProfileEditorEvents])
+  // No event listeners in profile editor window - state comes from Redux
+  // Main window handles all backend event listening and updates Redux store
+  // Profile editor window consumes state via Redux selectors
 
   const onMount = useCallback(() => {
-    const cleanup = setupEventListeners()
-    return cleanup
-  }, [setupEventListeners])
+    // Profile editor window initialization (no event listeners)
+    console.log(
+      'Profile editor window mounted - using Redux for state management'
+    )
+
+    // Return no cleanup function since we have no event listeners
+    return () => {
+      // No cleanup needed
+    }
+  }, [])
 
   return {
     state: {},

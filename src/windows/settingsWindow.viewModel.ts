@@ -6,23 +6,19 @@ export function useSettingsWindowViewModel() {
     invoke('close_settings_window').catch(console.error)
   }, [])
 
-  const handleShowSettings = useCallback(() => {
-    // Settings window specific logic can be added here
-    console.log('Settings window mounted')
-  }, [])
-
-  const setupEventListeners = useCallback(() => {
-    window.addEventListener('show-settings', handleShowSettings)
-
-    return () => {
-      window.removeEventListener('show-settings', handleShowSettings)
-    }
-  }, [handleShowSettings])
+  // No event listeners in settings window - state comes from Redux
+  // Main window handles all backend event listening and updates Redux store
+  // Settings window consumes state via Redux selectors
 
   const onMount = useCallback(() => {
-    const cleanup = setupEventListeners()
-    return cleanup
-  }, [setupEventListeners])
+    // Settings window initialization (no event listeners)
+    console.log('Settings window mounted - using Redux for state management')
+
+    // Return no cleanup function since we have no event listeners
+    return () => {
+      // No cleanup needed
+    }
+  }, [])
 
   return {
     state: {},

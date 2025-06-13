@@ -1,35 +1,23 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useSystemTray } from './hooks/useSystemTray'
 import { useBackendCommands } from './hooks/useBackendCommands'
+import { useAppSelector } from './store/hooks'
 import { invoke } from '@tauri-apps/api/core'
 
 export function useAppViewModel() {
   const { initializeTray, updateTrayStatus, hideWindow } = useSystemTray()
   const { loadProfiles } = useBackendCommands()
-  const [isSettingsWindow, setIsSettingsWindow] = useState(false)
+
+  // Use Redux state instead of URL-based detection
+  const windowState = useAppSelector((state) => state.app.windowState)
+  const isSettingsWindow = windowState.settingsWindow.visible
 
   const closeSettings = useCallback(() => {
     invoke('close_settings_window').catch(console.error)
   }, [])
 
-  const checkWindowType = useCallback(async () => {
-    try {
-      // Simple window type detection based on URL or location
-      const currentUrl = window.location.href
-      const isSettings =
-        currentUrl.includes('settings') ||
-        window.location.hash.includes('settings')
-      setIsSettingsWindow(isSettings)
-    } catch (error) {
-      console.error('Failed to get window info:', error)
-      // Default to main window if detection fails
-      setIsSettingsWindow(false)
-    }
-  }, [])
-
-  const handleShowSettings = useCallback(() => {
-    setIsSettingsWindow(true)
-  }, [])
+  // Remove URL-based window type detection - use Redux state machine events instead
+  // Window selection is now driven by backend state machine through Redux
 
   const handleTrayStartRecording = useCallback(() => {
     console.log('Starting recording from tray')
@@ -61,90 +49,46 @@ export function useAppViewModel() {
   )
 
   const initializeTrayAndShortcuts = useCallback(async () => {
-    if (isSettingsWindow) return
-
     try {
-      const isFirstLaunch =
-        localStorage.getItem('dicta-clerk-first-launch') === null
-
-      await initializeTray({
-        showStartupNotification: !isFirstLaunch,
-        globalShortcut: 'CmdOrCtrl+Shift+F9',
-        isFirstLaunch,
-      })
-
-      try {
-        await invoke('auto_init_shortcut_mgr')
-        console.log('Shortcut manager initialized')
-
-        try {
-          const status = await invoke('get_shortcut_status')
-          console.log('Shortcut status:', status)
-        } catch (statusError) {
-          console.error('Failed to get shortcut status:', statusError)
-        }
-      } catch (error) {
-        console.error('Failed to initialize shortcut manager:', error)
-      }
-
-      if (isFirstLaunch) {
-        localStorage.setItem('dicta-clerk-first-launch', 'false')
-      }
-
-      console.log('System tray initialized')
+      await initializeTray()
+      console.log('Tray and shortcuts initialized')
     } catch (error) {
-      console.error('Failed to initialize system tray:', error)
+      console.error('Failed to initialize tray and shortcuts:', error)
     }
-  }, [initializeTray, isSettingsWindow])
+  }, [initializeTray])
 
   const initializeBackendAndProfiles = useCallback(async () => {
-    // Load profiles on app startup
     try {
       await loadProfiles()
-      console.log('Profiles loaded successfully')
+      console.log('Backend and profiles initialized')
     } catch (error) {
-      console.error('Failed to load profiles:', error)
+      console.error('Failed to initialize backend and profiles:', error)
     }
   }, [loadProfiles])
 
+  // Centralized event listener setup - only for main window
+  // Settings window no longer sets up event listeners
   const setupEventListeners = useCallback(() => {
-    // Check window type
-    checkWindowType()
-
-    // Listen for show-settings event (for settings window)
-    window.addEventListener('show-settings', handleShowSettings)
-
-    // Handle tray events (only for main window)
-    if (!isSettingsWindow) {
-      window.addEventListener('tray-start-recording', handleTrayStartRecording)
-      window.addEventListener('tray-stop-recording', handleTrayStopRecording)
-      window.addEventListener('tray-show-settings', handleTrayShowSettings)
-      window.addEventListener('beforeunload', handleBeforeUnload)
-    }
+    // Handle tray events (centralized in main window)
+    window.addEventListener('tray-start-recording', handleTrayStartRecording)
+    window.addEventListener('tray-stop-recording', handleTrayStopRecording)
+    window.addEventListener('tray-show-settings', handleTrayShowSettings)
+    window.addEventListener('beforeunload', handleBeforeUnload)
 
     return () => {
-      window.removeEventListener('show-settings', handleShowSettings)
-      if (!isSettingsWindow) {
-        window.removeEventListener(
-          'tray-start-recording',
-          handleTrayStartRecording
-        )
-        window.removeEventListener(
-          'tray-stop-recording',
-          handleTrayStopRecording
-        )
-        window.removeEventListener('tray-show-settings', handleTrayShowSettings)
-        window.removeEventListener('beforeunload', handleBeforeUnload)
-      }
+      window.removeEventListener(
+        'tray-start-recording',
+        handleTrayStartRecording
+      )
+      window.removeEventListener('tray-stop-recording', handleTrayStopRecording)
+      window.removeEventListener('tray-show-settings', handleTrayShowSettings)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [
-    checkWindowType,
-    handleShowSettings,
     handleTrayStartRecording,
     handleTrayStopRecording,
     handleTrayShowSettings,
     handleBeforeUnload,
-    isSettingsWindow,
   ])
 
   const onMount = useCallback(() => {
