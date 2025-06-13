@@ -7,5 +7,6 @@ interface ReduxProviderProps {
 }
 
 export const ReduxProvider: React.FC<ReduxProviderProps> = ({ children }) => {
+  console.log('🔴 [REDUX-PROVIDER] ReduxProvider render')
   return <Provider store={store}>{children}</Provider>
 }

@@ -114,18 +114,79 @@ pub async fn start_recording_via_state_machine(
     state: State<'_, AppStateMachineState>,
     audio_state: State<'_, crate::commands::AudioCaptureState>,
 ) -> Result<String, String> {
+    eprintln!("🎙️ [STATE-MACHINE] start_recording_via_state_machine called");
+
+    // Check current state first
+    let current_state = {
+        let state_guard = state.lock().await;
+        if let Some(ref state_machine) = *state_guard {
+            let machine_guard = state_machine.lock().await;
+            let current = machine_guard.current_state();
+            eprintln!(
+                "📋 [STATE-MACHINE] Current state before recording: {:?}",
+                current
+            );
+            format!("{:?}", current)
+        } else {
+            eprintln!("❌ [STATE-MACHINE] State machine not initialized!");
+            return Err("State machine not initialized".to_string());
+        }
+    };
+
     // Process event through state machine first
+    eprintln!("🚀 [STATE-MACHINE] Processing StartRecording event...");
     process_event(crate::state::AppEvent::StartRecording, &state).await?;
+    eprintln!("✅ [STATE-MACHINE] StartRecording event processed successfully");
+
+    // Check new state after state machine transition
+    let new_state = {
+        let state_guard = state.lock().await;
+        if let Some(ref state_machine) = *state_guard {
+            let machine_guard = state_machine.lock().await;
+            let new = machine_guard.current_state();
+            eprintln!("📋 [STATE-MACHINE] New state after event: {:?}", new);
+            format!("{:?}", new)
+        } else {
+            "Unknown".to_string()
+        }
+    };
 
     // Then actually start the audio capture
+    eprintln!("🔊 [STATE-MACHINE] Starting audio capture...");
     let audio_guard = audio_state.lock().await;
     if let Some(ref capture) = *audio_guard {
-        capture
-            .start_capture()
-            .await
-            .map_err(|e| format!("Failed to start audio capture: {}", e))?;
-        Ok("Recording started".to_string())
+        eprintln!("📡 [STATE-MACHINE] Audio capture found, checking if already recording...");
+        let was_recording = capture.is_recording();
+        eprintln!(
+            "📊 [STATE-MACHINE] Audio capture status before start: {}",
+            was_recording
+        );
+
+        if was_recording {
+            eprintln!("⚠️ [STATE-MACHINE] Warning: Audio capture already recording");
+        }
+
+        let path = capture.start_capture().await.map_err(|e| {
+            eprintln!("❌ [STATE-MACHINE] Failed to start audio capture: {}", e);
+            format!("Failed to start audio capture: {}", e)
+        })?;
+
+        let now_recording = capture.is_recording();
+        eprintln!("✅ [STATE-MACHINE] Audio capture started successfully");
+        eprintln!(
+            "📊 [STATE-MACHINE] Audio capture status after start: {}",
+            now_recording
+        );
+        eprintln!("📁 [STATE-MACHINE] Recording path: {:?}", path);
+
+        Ok(format!(
+            "Recording started. State: {} -> {}. Path: {}",
+            current_state,
+            new_state,
+            path.to_string_lossy()
+        ))
     } else {
+        eprintln!("❌ [STATE-MACHINE] Audio capture not initialized");
         Err("Audio capture not initialized".to_string())
     }
 }

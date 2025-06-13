@@ -242,13 +242,49 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
   return {
     startRecording: async () => {
       try {
-        // Initialize audio capture first if needed
-        await invoke('init_audio_capture')
-        // Start recording
-        await invoke('start_capture')
-        console.log('Recording started via Redux')
+        console.log('🎙️ [RECORDING] Starting recording command initiated...')
+        console.time('start-recording')
+
+        // Check current state before starting
+        console.log('🔍 [RECORDING] Checking current state before recording...')
+        const currentState = await invoke('get_current_state')
+        console.log('📋 [RECORDING] Current state:', currentState)
+
+        // Check if audio capture is ready
+        console.log('🔍 [RECORDING] Checking audio capture status...')
+        const isCurrentlyRecording = await invoke('is_recording')
+        console.log('📊 [RECORDING] Audio capture status:', {
+          isCurrentlyRecording,
+        })
+
+        // Use state machine transition instead of direct audio commands
+        console.log(
+          '🚀 [RECORDING] Calling start_recording_via_state_machine...'
+        )
+        await invoke('start_recording_via_state_machine')
+        console.log(
+          '✅ [RECORDING] start_recording_via_state_machine completed'
+        )
+
+        // Verify recording started
+        console.log('🔍 [RECORDING] Verifying recording started...')
+        const isNowRecording = await invoke('is_recording')
+        const newState = await invoke('get_current_state')
+        console.log('📊 [RECORDING] Post-start verification:', {
+          isNowRecording,
+          newState,
+          stateChanged: currentState !== newState,
+        })
+
+        console.timeEnd('start-recording')
+        console.log('🎉 [RECORDING] Recording startup sequence completed')
       } catch (error) {
-        console.error('Failed to start recording:', error)
+        console.error('❌ [RECORDING] Failed to start recording:', error)
+        console.error('❌ [RECORDING] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : 'No stack trace',
+          errorString: String(error),
+        })
         const detailedError: AppError = {
           type: 'system',
           message: `Failed to start recording: ${error}`,
@@ -262,11 +298,12 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
     stopRecording: async () => {
       try {
-        // Stop recording and process to clipboard
+        console.log('🛑 Stopping recording via state machine...')
+        // Use comprehensive stop and process command
         await invoke('stop_recording_and_process_to_clipboard')
-        console.log('Recording stopped and processed via Redux')
+        console.log('✅ Recording stopped and processed via state machine')
       } catch (error) {
-        console.error('Failed to stop recording:', error)
+        console.error('❌ Failed to stop recording:', error)
         const detailedError: AppError = {
           type: 'system',
           message: `Failed to stop recording: ${error}`,
@@ -280,11 +317,12 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
 
     cancelRecording: async () => {
       try {
-        // Stop capture without processing
-        await invoke('stop_capture')
-        console.log('Recording cancelled via Redux')
+        console.log('🚫 Cancelling recording via state machine...')
+        // Use state machine event to cancel recording
+        await invoke('stop_recording_via_state_machine')
+        console.log('✅ Recording cancelled via state machine')
       } catch (error) {
-        console.error('Failed to cancel recording:', error)
+        console.error('❌ Failed to cancel recording:', error)
         const detailedError: AppError = {
           type: 'system',
           message: `Failed to cancel recording: ${error}`,

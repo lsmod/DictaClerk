@@ -4,11 +4,15 @@ use crate::audio::capture::AudioCapture;
 use crate::commands::{AudioCaptureState, SystemTrayState};
 use crate::services::{ShortcutMgr, ShortcutMgrConfig};
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
 /// Global state for the shortcut manager
 pub type ShortcutMgrState = Arc<Mutex<Option<Arc<ShortcutMgr>>>>;
+
+/// Global state for debouncing shortcut calls
+static LAST_SHORTCUT_CALL: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
 
 /// Load global shortcut from settings.json
 fn load_global_shortcut_from_settings() -> String {
@@ -76,10 +80,64 @@ pub async fn auto_init_shortcut_mgr(
 /// Toggle recording state with system tray integration - this is called by the global shortcut
 #[tauri::command]
 pub async fn toggle_record_with_tray(
+    app_handle: AppHandle,
     state_machine_state: State<'_, crate::state::AppStateMachineState>,
     tray_state: State<'_, SystemTrayState>,
+    audio_state: State<'_, crate::commands::AudioCaptureState>,
 ) -> Result<String, String> {
-    // First check if window is hidden
+    println!("🎯 [SHORTCUT] toggle_record_with_tray called");
+
+    // Debounce rapid calls (prevent double-triggering)
+    const DEBOUNCE_DURATION: Duration = Duration::from_millis(500);
+    let now = Instant::now();
+
+    {
+        let mut last_call = LAST_SHORTCUT_CALL.lock().unwrap();
+        if let Some(last_time) = *last_call {
+            if now.duration_since(last_time) < DEBOUNCE_DURATION {
+                println!("🚫 [SHORTCUT] Debounced - too soon after last call");
+                return Ok("Shortcut call debounced".to_string());
+            }
+        }
+        *last_call = Some(now);
+    }
+
+    // Check if settings window is open - if so, completely ignore the shortcut
+    if app_handle.get_webview_window("settings").is_some() {
+        println!("🚫 [SHORTCUT] Settings window open - ignoring shortcut");
+        return Ok("Global shortcut ignored - settings window is open".to_string());
+    }
+
+    // Check if we're in SettingsWindowOpen state - double check via state machine
+    {
+        let state_guard = state_machine_state.lock().await;
+        if let Some(ref state_machine) = *state_guard {
+            let machine_guard = state_machine.lock().await;
+            if matches!(
+                machine_guard.current_state(),
+                crate::state::AppState::SettingsWindowOpen { .. }
+            ) {
+                println!("🚫 [SHORTCUT] In settings window state - ignoring shortcut");
+                return Ok("Global shortcut ignored - in settings window state".to_string());
+            }
+        }
+    }
+
+    // Get current state from state machine (source of truth)
+    let current_state = {
+        let state_guard = state_machine_state.lock().await;
+        if let Some(ref state_machine) = *state_guard {
+            let machine_guard = state_machine.lock().await;
+            let state = machine_guard.current_state().clone();
+            println!("📋 [SHORTCUT] Current state machine state: {:?}", state);
+            state
+        } else {
+            println!("❌ [SHORTCUT] State machine not initialized");
+            return Err("State machine not initialized".to_string());
+        }
+    };
+
+    // Check if window is hidden and show it if needed
     let is_window_hidden = {
         let tray_guard = tray_state.lock().await;
         if let Some(ref service) = *tray_guard {
@@ -89,8 +147,8 @@ pub async fn toggle_record_with_tray(
         }
     };
 
-    // If window is hidden, show it first
     if is_window_hidden {
+        println!("👁️ [SHORTCUT] Window is hidden, showing it first...");
         // Process show window event through state machine
         if let Err(e) = crate::commands::state_machine::process_event(
             crate::state::AppEvent::ShowMainWindow,
@@ -111,17 +169,74 @@ pub async fn toggle_record_with_tray(
         }
     }
 
-    // Process toggle recording event through state machine
-    if let Err(e) = crate::commands::state_machine::process_event(
-        crate::state::AppEvent::ToggleRecording,
-        &state_machine_state,
-    )
-    .await
-    {
-        return Err(format!("Failed to process toggle recording event: {}", e));
-    }
+    // Handle recording toggle based on current state machine state
+    match current_state {
+        crate::state::AppState::Idle { .. } => {
+            // Start recording
+            println!("🎙️ [SHORTCUT] Starting recording from Idle state...");
 
-    Ok("Recording toggled through state machine".to_string())
+            // Process start recording event through state machine
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::ToggleRecording,
+                &state_machine_state,
+            )
+            .await
+            {
+                return Err(format!("Failed to process start recording event: {}", e));
+            }
+
+            // Actually start the audio capture
+            let audio_guard = audio_state.lock().await;
+            if let Some(ref capture) = *audio_guard {
+                let path = capture
+                    .start_capture()
+                    .await
+                    .map_err(|e| format!("Failed to start audio capture: {}", e))?;
+                println!("✅ [SHORTCUT] Recording started successfully");
+                Ok(format!(
+                    "Recording started. File: {}",
+                    path.to_string_lossy()
+                ))
+            } else {
+                Err("Audio capture not initialized".to_string())
+            }
+        }
+        crate::state::AppState::Recording { .. } => {
+            // Stop recording
+            println!("🛑 [SHORTCUT] Stopping recording from Recording state...");
+
+            // Process stop recording event through state machine
+            if let Err(e) = crate::commands::state_machine::process_event(
+                crate::state::AppEvent::ToggleRecording,
+                &state_machine_state,
+            )
+            .await
+            {
+                return Err(format!("Failed to process stop recording event: {}", e));
+            }
+
+            // Actually stop the audio capture
+            let audio_guard = audio_state.lock().await;
+            if let Some(ref capture) = *audio_guard {
+                let path = capture
+                    .stop_capture()
+                    .await
+                    .map_err(|e| format!("Failed to stop audio capture: {}", e))?;
+                println!("✅ [SHORTCUT] Recording stopped successfully");
+                Ok(format!(
+                    "Recording stopped. File: {}",
+                    path.to_string_lossy()
+                ))
+            } else {
+                Err("Audio capture not initialized".to_string())
+            }
+        }
+        _ => {
+            // In processing or other states - ignore toggle
+            println!("⏸️ [SHORTCUT] In processing state - ignoring toggle recording");
+            Ok("Recording toggle ignored - app is processing".to_string())
+        }
+    }
 }
 
 /// Toggle recording state - original function for backward compatibility

@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { useAppSelector } from '../store/hooks'
 import { useBackendCommands } from '../hooks/useBackendCommands'
+import { listen } from '@tauri-apps/api/event'
 
 interface StopButtonState {
   status: string
@@ -22,6 +24,41 @@ export const useStopButtonViewModel = () => {
 
   const isRecording = status === 'recording'
   const isProcessing = status.startsWith('processing')
+
+  // Listen to state machine events for better synchronization
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+
+    const setupStateListener = async () => {
+      try {
+        unlisten = await listen('app-state-changed', (event) => {
+          console.log('Stop button received state change:', event.payload)
+          // The state change will trigger re-render via Redux store update
+          // This ensures button state is synchronized with backend state machine
+        })
+      } catch (error) {
+        console.error('Failed to set up state change listener:', error)
+      }
+    }
+
+    setupStateListener()
+
+    return () => {
+      if (unlisten) {
+        unlisten()
+      }
+    }
+  }, [])
+
+  // Debug logging for button state changes
+  useEffect(() => {
+    console.log('Stop button state update:', {
+      reduxStatus: status,
+      isRecording,
+      isProcessing,
+      buttonState: getButtonState(),
+    })
+  }, [status, isRecording, isProcessing])
 
   const announceRecordingState = (recording: boolean) => {
     const liveRegion = document.getElementById('main-live-region')
@@ -46,25 +83,58 @@ export const useStopButtonViewModel = () => {
   }
 
   const handleToggle = async () => {
+    console.log('🔘 [STOP-BUTTON] handleToggle called')
+    console.log('🔍 [STOP-BUTTON] Current state check:', {
+      status,
+      isRecording,
+      isProcessing,
+      disabled: isProcessing,
+    })
+
     // Prevent action if already processing
-    if (isProcessing) return
+    if (isProcessing) {
+      console.log(
+        '🚫 [STOP-BUTTON] Toggle recording blocked - currently processing'
+      )
+      return
+    }
 
     try {
+      console.log('🎛️ [STOP-BUTTON] Proceeding with toggle recording:', {
+        currentState: status,
+        isRecording,
+        action: isRecording ? 'STOP' : 'START',
+      })
+
       if (isRecording) {
+        console.log('🛑 [STOP-BUTTON] Calling stopRecording()...')
         await stopRecording()
+        console.log('✅ [STOP-BUTTON] stopRecording() completed')
         announceRecordingState(false)
       } else {
+        console.log('🎙️ [STOP-BUTTON] Calling startRecording()...')
         await startRecording()
+        console.log('✅ [STOP-BUTTON] startRecording() completed')
         announceRecordingState(true)
       }
+
+      console.log('🎉 [STOP-BUTTON] Toggle recording completed successfully')
     } catch (error) {
-      console.error('Failed to toggle recording:', error)
+      console.error('❌ [STOP-BUTTON] Failed to toggle recording:', error)
+      console.error('❌ [STOP-BUTTON] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        error: String(error),
+      })
       announceError('Failed to toggle recording')
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isProcessing) return // Prevent keyboard action during processing
+    if (isProcessing) {
+      console.log('Keyboard action blocked - currently processing')
+      return // Prevent keyboard action during processing
+    }
 
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -104,7 +174,12 @@ export const useStopButtonViewModel = () => {
   }
 
   const onMount = () => {
-    // No initialization needed for this component
+    console.log('Stop button mounted with initial state:', {
+      status,
+      isRecording,
+      isProcessing,
+      buttonState: getButtonState(),
+    })
   }
 
   return { state, actions, onMount }

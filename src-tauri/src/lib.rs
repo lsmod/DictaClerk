@@ -50,13 +50,21 @@ fn setup_backend_event_listeners(app_handle: AppHandle) {
             // Route through the toggle_record_with_tray command which handles state machine
             match app_handle.try_state::<crate::state::AppStateMachineState>() {
                 Some(state_machine_state) => match app_handle.try_state::<SystemTrayState>() {
-                    Some(tray_state) => {
-                        if let Err(e) =
-                            toggle_record_with_tray(state_machine_state, tray_state).await
-                        {
-                            eprintln!("Failed to toggle recording from global shortcut: {}", e);
+                    Some(tray_state) => match app_handle.try_state::<AudioCaptureState>() {
+                        Some(audio_state) => {
+                            if let Err(e) = toggle_record_with_tray(
+                                app_handle.clone(),
+                                state_machine_state,
+                                tray_state,
+                                audio_state,
+                            )
+                            .await
+                            {
+                                eprintln!("Failed to toggle recording from global shortcut: {}", e);
+                            }
                         }
-                    }
+                        None => eprintln!("Audio capture state not found for global shortcut"),
+                    },
                     None => eprintln!("System tray state not found for global shortcut"),
                 },
                 None => eprintln!("State machine not found for global shortcut"),

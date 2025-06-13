@@ -203,41 +203,20 @@ pub async fn open_settings_window(
     state_machine_state: State<'_, AppStateMachineState>,
     tray_state: State<'_, SystemTrayState>,
 ) -> Result<String, String> {
-    // First emit event to state machine
+    // First emit event to state machine - this will handle stopping recording/processing
+    // and transition to SettingsWindowOpen{previous_state: Idle}
     if let Err(e) = process_event(AppEvent::OpenSettingsWindow, &state_machine_state).await {
         eprintln!("Warning: Failed to process OpenSettingsWindow event: {}", e);
     }
 
-    // Check current state to determine if we should hide main window
-    let should_hide_main_window = {
-        let state_guard = state_machine_state.lock().await;
-        if let Some(ref state_machine) = *state_guard {
-            let machine_guard = state_machine.lock().await;
-            let current_state = machine_guard.current_state();
-            // Hide main window during recording and processing states to avoid confusion
-            matches!(
-                current_state,
-                crate::state::AppState::Recording { .. }
-                    | crate::state::AppState::ProcessingTranscription { .. }
-                    | crate::state::AppState::ProcessingGPTFormatting { .. }
-                    | crate::state::AppState::ProcessingClipboard { .. }
-                    | crate::state::AppState::ProcessingComplete { .. }
-            )
-        } else {
-            false
-        }
-    };
-
-    // Hide main window if we're in a processing state
-    if should_hide_main_window {
-        let tray_guard = tray_state.lock().await;
-        if let Some(ref service) = *tray_guard {
-            if let Err(e) = service.hide_main_window().await {
-                eprintln!(
-                    "Warning: Failed to hide main window when opening settings: {}",
-                    e
-                );
-            }
+    // Always hide main window when opening settings regardless of current state
+    let tray_guard = tray_state.lock().await;
+    if let Some(ref service) = *tray_guard {
+        if let Err(e) = service.hide_main_window().await {
+            eprintln!(
+                "Warning: Failed to hide main window when opening settings: {}",
+                e
+            );
         }
     }
 
@@ -277,7 +256,7 @@ pub async fn close_settings_window(
     state_machine_state: State<'_, AppStateMachineState>,
     tray_state: State<'_, SystemTrayState>,
 ) -> Result<String, String> {
-    // First emit event to state machine
+    // First emit event to state machine - this will transition to Idle{main_window_visible: true}
     if let Err(e) = process_event(AppEvent::CloseSettingsWindow, &state_machine_state).await {
         eprintln!(
             "Warning: Failed to process CloseSettingsWindow event: {}",
@@ -285,28 +264,14 @@ pub async fn close_settings_window(
         );
     }
 
-    // Check if we should show main window after closing settings
-    let should_show_main_window = {
-        let state_guard = state_machine_state.lock().await;
-        if let Some(ref state_machine) = *state_guard {
-            let machine_guard = state_machine.lock().await;
-            // Show main window if it should be visible according to state machine
-            machine_guard.is_main_window_visible()
-        } else {
-            true // Default to showing if state machine not available
-        }
-    };
-
-    // Show main window if it should be visible
-    if should_show_main_window {
-        let tray_guard = tray_state.lock().await;
-        if let Some(ref service) = *tray_guard {
-            if let Err(e) = service.show_main_window().await {
-                eprintln!(
-                    "Warning: Failed to show main window when closing settings: {}",
-                    e
-                );
-            }
+    // Always show main window after closing settings (as per state machine transition to Idle)
+    let tray_guard = tray_state.lock().await;
+    if let Some(ref service) = *tray_guard {
+        if let Err(e) = service.show_main_window().await {
+            eprintln!(
+                "Warning: Failed to show main window when closing settings: {}",
+                e
+            );
         }
     }
 

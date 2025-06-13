@@ -388,15 +388,26 @@ impl AppStateMachine {
             (AppState::Recording { .. }, AppEvent::CancelRecording) => Ok(AppState::Idle {
                 main_window_visible: true,
             }),
+            // Opening settings from recording state - force stop recording and set previous_state to Idle
+            (AppState::Recording { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
+                })
+            }
             // Profile selection ignored during recording
             (AppState::Recording { .. }, AppEvent::SelectProfile { .. }) => {
                 Ok(self.current_state.clone()) // Ignore profile changes during recording
             }
 
             // === FROM PROCESSING STATES ===
+            // Opening settings from processing states - force cancel processing and set previous_state to Idle
             (AppState::ProcessingTranscription { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(self.current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
             (AppState::ProcessingTranscription { .. }, AppEvent::ToggleRecording) => {
@@ -407,12 +418,16 @@ impl AppStateMachine {
             }
             (AppState::ProcessingGPTFormatting { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(self.current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
             (AppState::ProcessingClipboard { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(self.current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
 
@@ -502,7 +517,9 @@ impl AppStateMachine {
             // === FROM PROCESSING COMPLETE ===
             (AppState::ProcessingComplete { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(self.current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
             (AppState::ProcessingComplete { .. }, AppEvent::StartRecording) => {
@@ -529,40 +546,24 @@ impl AppStateMachine {
             }),
 
             // === FROM SETTINGS WINDOW ===
-            (AppState::SettingsWindowOpen { previous_state }, AppEvent::CloseSettingsWindow) => {
-                Ok(*previous_state.clone())
+            (AppState::SettingsWindowOpen { previous_state: _ }, AppEvent::CloseSettingsWindow) => {
+                Ok(AppState::Idle {
+                    main_window_visible: true,
+                })
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::SelectProfile { .. }) => {
                 // Profile selection is allowed from settings window - state doesn't change
                 Ok(self.current_state.clone())
             }
-            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ToggleRecording) => {
-                // Allow toggle recording from settings window - close settings and toggle recording
-                match previous_state.as_ref() {
-                    AppState::Idle { .. } => Ok(AppState::Recording {
-                        started_at: SystemTime::now(),
-                    }),
-                    AppState::Recording { .. } => {
-                        // If we were recording before opening settings, stop recording
-                        Ok(AppState::ProcessingTranscription {
-                            wav_path: PathBuf::from("/tmp/recording.wav"), // This will be updated by the actual command
-                            started_at: SystemTime::now(),
-                        })
-                    }
-                    _ => {
-                        // For other states, just close settings and return to previous state
-                        Ok(*previous_state.clone())
-                    }
-                }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::ToggleRecording) => {
+                // Completely ignore toggle recording when settings window is open
+                Ok(self.current_state.clone())
             }
-            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ShowMainWindow) => {
-                // Show main window and close settings
-                match previous_state.as_ref() {
-                    AppState::Idle { .. } => Ok(AppState::Idle {
-                        main_window_visible: true,
-                    }),
-                    _ => Ok(*previous_state.clone()),
-                }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::ShowMainWindow) => {
+                // Show main window and close settings - always return to idle
+                Ok(AppState::Idle {
+                    main_window_visible: true,
+                })
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::OpenSettingsWindow) => {
                 // Settings window is already open - no state change
@@ -788,15 +789,26 @@ impl AppStateMachine {
             (AppState::Recording { .. }, AppEvent::CancelRecording) => Ok(AppState::Idle {
                 main_window_visible: true,
             }),
+            // Opening settings from recording state - force stop recording and set previous_state to Idle
+            (AppState::Recording { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
+                })
+            }
             // Profile selection ignored during recording
             (AppState::Recording { .. }, AppEvent::SelectProfile { .. }) => {
                 Ok(current_state.clone()) // Ignore profile changes during recording
             }
 
             // === FROM PROCESSING STATES ===
+            // Opening settings from processing states - force cancel processing and set previous_state to Idle
             (AppState::ProcessingTranscription { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
             (AppState::ProcessingTranscription { .. }, AppEvent::ToggleRecording) => {
@@ -807,12 +819,16 @@ impl AppStateMachine {
             }
             (AppState::ProcessingGPTFormatting { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
             (AppState::ProcessingClipboard { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
 
@@ -902,7 +918,9 @@ impl AppStateMachine {
             // === FROM PROCESSING COMPLETE ===
             (AppState::ProcessingComplete { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
-                    previous_state: Box::new(current_state.clone()),
+                    previous_state: Box::new(AppState::Idle {
+                        main_window_visible: true,
+                    }),
                 })
             }
             (AppState::ProcessingComplete { .. }, AppEvent::StartRecording) => {
@@ -929,40 +947,24 @@ impl AppStateMachine {
             }),
 
             // === FROM SETTINGS WINDOW ===
-            (AppState::SettingsWindowOpen { previous_state }, AppEvent::CloseSettingsWindow) => {
-                Ok(*previous_state.clone())
+            (AppState::SettingsWindowOpen { previous_state: _ }, AppEvent::CloseSettingsWindow) => {
+                Ok(AppState::Idle {
+                    main_window_visible: true,
+                })
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::SelectProfile { .. }) => {
                 // Profile selection is allowed from settings window - state doesn't change
                 Ok(current_state.clone())
             }
-            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ToggleRecording) => {
-                // Allow toggle recording from settings window - close settings and toggle recording
-                match previous_state.as_ref() {
-                    AppState::Idle { .. } => Ok(AppState::Recording {
-                        started_at: SystemTime::now(),
-                    }),
-                    AppState::Recording { .. } => {
-                        // If we were recording before opening settings, stop recording
-                        Ok(AppState::ProcessingTranscription {
-                            wav_path: PathBuf::from("/tmp/recording.wav"), // This will be updated by the actual command
-                            started_at: SystemTime::now(),
-                        })
-                    }
-                    _ => {
-                        // For other states, just close settings and return to previous state
-                        Ok(*previous_state.clone())
-                    }
-                }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::ToggleRecording) => {
+                // Completely ignore toggle recording when settings window is open
+                Ok(current_state.clone())
             }
-            (AppState::SettingsWindowOpen { previous_state }, AppEvent::ShowMainWindow) => {
-                // Show main window and close settings
-                match previous_state.as_ref() {
-                    AppState::Idle { .. } => Ok(AppState::Idle {
-                        main_window_visible: true,
-                    }),
-                    _ => Ok(*previous_state.clone()),
-                }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::ShowMainWindow) => {
+                // Show main window and close settings - always return to idle
+                Ok(AppState::Idle {
+                    main_window_visible: true,
+                })
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::OpenSettingsWindow) => {
                 // Settings window is already open - no state change
