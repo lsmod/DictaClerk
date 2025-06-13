@@ -297,103 +297,31 @@ pub async fn load_settings() -> Result<SettingsConfig, String> {
         .map_err(|e| format!("Failed to parse settings.json: {}", e))
 }
 
-/// Save settings to settings.json file (legacy endpoint)
+/// Save settings to settings.json
 #[tauri::command]
-pub async fn save_settings(
-    settings: SettingsConfig,
-    app_handle: AppHandle,
-) -> Result<String, String> {
-    v1_save_settings(settings, app_handle).await
+pub async fn save_settings(settings: SettingsConfig) -> Result<String, String> {
+    // Normalize the global shortcut before saving
+    let mut normalized_settings = settings;
+    normalized_settings.global_shortcut = normalize_shortcut(&normalized_settings.global_shortcut);
+
+    let settings_path = find_config_file_path("settings.json")
+        .ok_or_else(|| "Could not determine settings.json path".to_string())?;
+
+    atomic_write_json(&settings_path, &normalized_settings)
+        .await
+        .map_err(|e| format!("Failed to save settings: {}", e))?;
+
+    println!("Settings saved to: {}", settings_path.display());
+    Ok(format!("Settings saved to: {}", settings_path.display()))
 }
 
-/// Save settings to settings.json file with atomic writes and proper error handling
+/// Legacy save settings function for backward compatibility
 #[tauri::command]
 pub async fn v1_save_settings(
     settings: SettingsConfig,
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
 ) -> Result<String, String> {
-    let target_path = find_config_file_path("settings.json")
-        .ok_or_else(|| "Could not determine settings.json path".to_string())?;
-
-    // Create backup before attempting to save
-    let backup_path = create_backup(&target_path)
-        .await
-        .map_err(|e| format!("Failed to create backup: {}", e))?;
-
-    // Attempt atomic write
-    match atomic_write_json(&target_path, &settings).await {
-        Ok(_) => {
-            // Clean up backup on success
-            if let Some(backup) = backup_path {
-                let _ = tokio::fs::remove_file(backup).await;
-            }
-            Ok(format!(
-                "Settings saved successfully to {}",
-                target_path.display()
-            ))
-        }
-        Err(e) => {
-            // Rollback on failure
-            if let Some(backup) = backup_path {
-                if let Err(restore_err) = restore_from_backup(&backup, &target_path).await {
-                    eprintln!("Failed to restore backup: {}", restore_err);
-                }
-                let _ = tokio::fs::remove_file(backup).await;
-            }
-
-            // Handle permission errors with helpful guidance
-            if let PersistenceError::IoError { source, .. } = &e {
-                if source.kind() == ErrorKind::PermissionDenied {
-                    eprintln!("⚠️  Permission denied writing to config directory.");
-                    eprintln!(
-                        "💡 Tip: Grant write permissions with: chmod +w {}",
-                        target_path
-                            .parent()
-                            .unwrap_or_else(|| Path::new("."))
-                            .display()
-                    );
-                    eprintln!("📁 Falling back to current directory");
-
-                    // Try fallback location
-                    let fallback_path = PathBuf::from("settings.json");
-                    if (atomic_write_json(&fallback_path, &settings).await).is_ok() {
-                        return Ok(format!(
-                            "Settings saved to fallback location: {}",
-                            fallback_path.display()
-                        ));
-                    }
-                }
-            }
-
-            // Show error toast for disk full scenarios
-            if e.is_disk_full() {
-                let notifier = TauriNotifierService::new(app_handle.clone());
-                let _ = notifier
-                    .error("Disk full - unable to save settings. Settings have been rolled back.")
-                    .await;
-
-                // Emit event for frontend to handle
-                let _ = app_handle.emit_to(
-                    "main",
-                    "disk_full_error",
-                    serde_json::json!({
-                        "type": "settings",
-                        "message": "Disk full - settings rollback performed"
-                    }),
-                );
-
-                Err(format!("DISK_FULL: {}", e))
-            } else {
-                // Show generic error toast
-                let notifier = TauriNotifierService::new(app_handle.clone());
-                let _ = notifier
-                    .error(&format!("Failed to save settings: {}", e))
-                    .await;
-
-                Err(format!("Settings save failed: {}", e))
-            }
-        }
-    }
+    save_settings(settings).await
 }
 
 /// Save profiles to profiles.json file (legacy endpoint)
@@ -501,6 +429,19 @@ pub async fn v1_save_profiles(
     }
 }
 
+/// Normalize shortcut format for comparison
+/// Converts "Ctrl+Shift+F9" to "CmdOrCtrl+Shift+F9" on non-Mac platforms
+/// and handles other format variations
+fn normalize_shortcut(shortcut: &str) -> String {
+    // Handle the common case where user types "Ctrl" but system expects "CmdOrCtrl"
+    if shortcut.starts_with("Ctrl+") {
+        // On non-Mac platforms, "Ctrl" should be treated as "CmdOrCtrl"
+        shortcut.replace("Ctrl+", "CmdOrCtrl+")
+    } else {
+        shortcut.to_string()
+    }
+}
+
 /// Validate if a shortcut conflicts with existing shortcuts
 #[tauri::command]
 pub async fn validate_shortcut_conflict(
@@ -515,14 +456,19 @@ pub async fn validate_shortcut_conflict(
     let state_guard = state.lock().await;
 
     if let Some(ref mgr) = *state_guard {
-        // If the shortcut is the same as the current global shortcut, it's valid
+        let normalized_shortcut = normalize_shortcut(&shortcut);
+        let current_shortcut = mgr.get_shortcut();
+
+        // If the normalized shortcut is the same as the current global shortcut, it's valid
         // (user is not changing it or changing it back to the same value)
-        if shortcut == mgr.get_shortcut() {
+        if normalized_shortcut == current_shortcut || shortcut == current_shortcut {
             return Ok(true);
         }
 
         // Check if the shortcut is already registered for other purposes
-        let is_registered = mgr.is_shortcut_registered(&shortcut).await;
+        // Try both the original and normalized versions
+        let is_registered = mgr.is_shortcut_registered(&shortcut).await
+            || mgr.is_shortcut_registered(&normalized_shortcut).await;
         // Return true if NOT conflicting (i.e., not registered)
         Ok(!is_registered)
     } else {

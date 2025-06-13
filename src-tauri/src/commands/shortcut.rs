@@ -12,35 +12,22 @@ pub type ShortcutMgrState = Arc<Mutex<Option<Arc<ShortcutMgr>>>>;
 
 /// Load global shortcut from settings.json
 fn load_global_shortcut_from_settings() -> String {
-    let settings_paths = vec!["settings.json", "../settings.json", "../../settings.json"];
+    use crate::utils::find_config_file_path;
 
-    for path in &settings_paths {
-        if std::path::Path::new(path).exists() {
-            if let Ok(content) = std::fs::read_to_string(path) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(shortcut) = json.get("global_shortcut").and_then(|v| v.as_str()) {
-                        return shortcut.to_string();
-                    }
+    // Use the proper config file path resolution
+    if let Some(settings_path) = find_config_file_path("settings.json") {
+        if let Ok(content) = std::fs::read_to_string(&settings_path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(shortcut) = json.get("global_shortcut").and_then(|v| v.as_str()) {
+                    println!("Loaded global shortcut from settings: {}", shortcut);
+                    return shortcut.to_string();
                 }
             }
         }
     }
 
-    // Try current directory approach
-    if let Ok(current_dir) = std::env::current_dir() {
-        let settings_in_current = current_dir.join("settings.json");
-        if settings_in_current.exists() {
-            if let Ok(content) = std::fs::read_to_string(&settings_in_current) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(shortcut) = json.get("global_shortcut").and_then(|v| v.as_str()) {
-                        return shortcut.to_string();
-                    }
-                }
-            }
-        }
-    }
-
-    // Default shortcut
+    // Default shortcut if settings file not found or doesn't contain shortcut
+    println!("Using default global shortcut: CmdOrCtrl+Shift+F9");
     "CmdOrCtrl+Shift+F9".to_string()
 }
 

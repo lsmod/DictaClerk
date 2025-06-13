@@ -399,6 +399,12 @@ impl AppStateMachine {
                     previous_state: Box::new(self.current_state.clone()),
                 })
             }
+            (AppState::ProcessingTranscription { .. }, AppEvent::ToggleRecording) => {
+                // Allow toggle recording during transcription - this cancels the transcription and returns to idle
+                Ok(AppState::Idle {
+                    main_window_visible: true,
+                })
+            }
             (AppState::ProcessingGPTFormatting { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
                     previous_state: Box::new(self.current_state.clone()),
@@ -791,6 +797,12 @@ impl AppStateMachine {
             (AppState::ProcessingTranscription { .. }, AppEvent::OpenSettingsWindow) => {
                 Ok(AppState::SettingsWindowOpen {
                     previous_state: Box::new(current_state.clone()),
+                })
+            }
+            (AppState::ProcessingTranscription { .. }, AppEvent::ToggleRecording) => {
+                // Allow toggle recording during transcription - this cancels the transcription and returns to idle
+                Ok(AppState::Idle {
+                    main_window_visible: true,
                 })
             }
             (AppState::ProcessingGPTFormatting { .. }, AppEvent::OpenSettingsWindow) => {

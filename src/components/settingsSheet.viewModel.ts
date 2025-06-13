@@ -393,10 +393,17 @@ export function useSettingsSheetViewModel(onClose: () => void) {
         // Update global shortcut if it changed
         if (shortcutChanged) {
           try {
+            // Normalize shortcut format for consistency (Ctrl -> CmdOrCtrl on non-Mac)
+            const normalizedShortcut = settings.global_shortcut.startsWith(
+              'Ctrl+'
+            )
+              ? settings.global_shortcut.replace('Ctrl+', 'CmdOrCtrl+')
+              : settings.global_shortcut
+
             await invoke('update_global_shortcut', {
-              newShortcut: settings.global_shortcut,
+              newShortcut: normalizedShortcut,
             })
-            console.log('Global shortcut updated to:', settings.global_shortcut)
+            console.log('Global shortcut updated to:', normalizedShortcut)
           } catch (shortcutError) {
             console.error('Failed to update global shortcut:', shortcutError)
             // Don't fail the save operation, but show a warning

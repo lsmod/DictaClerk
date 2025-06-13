@@ -400,18 +400,23 @@ impl ShortcutMgr {
     pub async fn is_shortcut_registered(&self, shortcut_str: &str) -> bool {
         let shortcuts = self.registered_shortcuts.lock().await;
 
-        // Check if it's the global shortcut
+        // If it's the same as the current global shortcut, it's NOT a conflict
+        // (user is setting it to the same value or not changing it)
         if shortcut_str == self.config.global_shortcut {
-            return shortcuts.contains_key(&self.config.global_shortcut);
+            return false; // Not a conflict - same as current
         }
 
-        // Check all registered shortcuts
-        for registered_shortcut in shortcuts.keys() {
-            // We need to check if the shortcut string matches any registered shortcut
-            // Since we store the parsed Shortcut, we need to compare the original strings
-            // This is a simplified approach - in a real implementation you might want
-            // to store both the string and parsed shortcut
-            if registered_shortcut.contains(&shortcut_str.replace(" ", "")) {
+        // Check all registered shortcuts (excluding the global shortcut key)
+        for (key, _) in shortcuts.iter() {
+            // Skip the global shortcut key since we already handled that case above
+            if key == &self.config.global_shortcut {
+                continue;
+            }
+
+            // Check if this shortcut conflicts with any profile shortcuts
+            // This is a simplified check - in a real implementation you might want
+            // to store both the string and parsed shortcut for better comparison
+            if key.contains(&shortcut_str.replace(" ", "")) {
                 return true;
             }
         }
