@@ -21,8 +21,8 @@ use commands::{
     select_profile, settings::ensure_default_configs, should_main_window_be_visible,
     show_main_window, show_window_and_start_recording, start_capture,
     start_recording_via_state_machine, stop_capture, stop_recording_and_process_to_clipboard,
-    stop_recording_via_state_machine, subscribe_rms, toggle_main_window, toggle_record,
-    toggle_record_with_tray, transcribe_audio, transcribe_recorded_audio,
+    stop_recording_via_state_machine, subscribe_rms, test_api_key, toggle_main_window,
+    toggle_record, toggle_record_with_tray, transcribe_audio, transcribe_recorded_audio,
     unregister_all_profile_shortcuts, unregister_global_shortcut, unregister_profile_shortcut,
     update_global_shortcut, update_tray_global_shortcut, update_tray_status, v1_save_profiles,
     v1_save_settings, validate_shortcut_conflict, AudioCaptureState, ClipboardServiceState,
@@ -268,7 +268,8 @@ pub fn run() {
             enable_auto_recovery_via_state_machine,
             get_error_state,
             reset_app_state_via_state_machine,
-            retry_backend_connection
+            retry_backend_connection,
+            test_api_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

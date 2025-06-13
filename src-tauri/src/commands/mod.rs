@@ -52,7 +52,7 @@ pub use system_tray::{
     update_tray_status, SystemTrayState,
 };
 pub use whisper::{
-    get_whisper_info, init_whisper_client, is_whisper_initialized, transcribe_audio,
+    get_whisper_info, init_whisper_client, is_whisper_initialized, test_api_key, transcribe_audio,
     transcribe_recorded_audio, WhisperClientState,
 };
 

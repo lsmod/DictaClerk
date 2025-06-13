@@ -369,6 +369,12 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
         </div>
       )}
 
+      {state.apiKeyTestSuccess && (
+        <div className="success-message" role="status" aria-live="polite">
+          API key is valid and working! You can now save your settings.
+        </div>
+      )}
+
       <div className="settings-form">
         <form onSubmit={(e) => e.preventDefault()}>
           <div className="form-group">
@@ -573,13 +579,15 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
               disabled={
                 state.isSaving ||
                 !state.settings ||
-                !state.hasUnsavedChanges ||
+                (!state.hasUnsavedChanges && !state.apiKeyTestSuccess) ||
                 (!state.shortcutValidation.isValid &&
                   Boolean(state.settings?.global_shortcut)) ||
                 state.shortcutValidation.isValidating
               }
               aria-label={`Save settings${
                 state.hasUnsavedChanges ? ' (has unsaved changes)' : ''
+              }${
+                state.apiKeyTestSuccess ? ' (API key tested successfully)' : ''
               }`}
               aria-describedby={
                 state.hasUnsavedChanges ? 'save-status' : undefined

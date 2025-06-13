@@ -8,6 +8,71 @@ use tokio::sync::Mutex;
 /// Global state for the Whisper client
 pub type WhisperClientState = Arc<Mutex<Option<Arc<dyn WhisperClient + Send + Sync>>>>;
 
+/// Test API key by making a simple request to OpenAI Chat Completions API
+/// This uses the same endpoint that the GPT formatter uses, so it's a more accurate test
+#[tauri::command]
+pub async fn test_api_key(api_key: String) -> Result<String, String> {
+    if api_key.is_empty() {
+        return Err("API key cannot be empty".to_string());
+    }
+
+    if !api_key.starts_with("sk-") {
+        return Err("Invalid API key format. OpenAI API keys should start with 'sk-'".to_string());
+    }
+
+    // Create a temporary client for testing
+    let client = reqwest::Client::new();
+
+    // Test the API key by making a minimal chat completion request
+    // This is the same endpoint the app uses for GPT formatting
+    let test_request = serde_json::json!({
+        "model": "gpt-4o",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Test"
+            }
+        ],
+        "max_tokens": 5,
+        "temperature": 0.0
+    });
+
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .header("User-Agent", "DictaClerk/1.0")
+        .timeout(std::time::Duration::from_secs(10))
+        .json(&test_request)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    match response.status() {
+        reqwest::StatusCode::OK => Ok("API key is valid and working".to_string()),
+        reqwest::StatusCode::UNAUTHORIZED => {
+            Err("Invalid API key. Please check your OpenAI API key".to_string())
+        }
+        reqwest::StatusCode::FORBIDDEN => Err("API key lacks necessary permissions".to_string()),
+        reqwest::StatusCode::TOO_MANY_REQUESTS => {
+            Err("API rate limit exceeded. Please try again later".to_string())
+        }
+        reqwest::StatusCode::BAD_REQUEST => {
+            // Try to get more specific error information for 400 errors
+            let error_text = response.text().await.unwrap_or_default();
+            if error_text.contains("model") {
+                Err("API key doesn't have access to GPT-4o model. Please check your API key permissions".to_string())
+            } else {
+                Err(format!("Bad request: {}", error_text))
+            }
+        }
+        status => {
+            let error_text = response.text().await.unwrap_or_default();
+            Err(format!("API error ({}): {}", status, error_text))
+        }
+    }
+}
+
 /// Initialize the Whisper client with API key
 #[tauri::command]
 pub async fn init_whisper_client(

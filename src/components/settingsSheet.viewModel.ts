@@ -16,6 +16,7 @@ interface SettingsSheetState {
   saveError: string | null
   saveSuccess: boolean
   isTestingApiKey: boolean
+  apiKeyTestSuccess: boolean
   hasUnsavedChanges: boolean
   profiles: Profile[]
   isLoadingProfiles: boolean
@@ -66,6 +67,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isTestingApiKey, setIsTestingApiKey] = useState(false)
+  const [apiKeyTestSuccess, setApiKeyTestSuccess] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const [shortcutValidation, setShortcutValidation] = useState<{
@@ -285,6 +287,7 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     saveError,
     saveSuccess,
     isTestingApiKey,
+    apiKeyTestSuccess,
     hasUnsavedChanges,
     profiles,
     isLoadingProfiles,
@@ -363,6 +366,9 @@ export function useSettingsSheetViewModel(onClose: () => void) {
             }
           : null
       )
+      // Clear API key test success when key is changed
+      setApiKeyTestSuccess(false)
+      setSaveError(null)
     },
     saveSettings: async (e?: React.MouseEvent) => {
       // Prevent any default button behavior
@@ -479,40 +485,29 @@ export function useSettingsSheetViewModel(onClose: () => void) {
       try {
         setIsTestingApiKey(true)
         setSaveError(null)
+        setSaveSuccess(false)
+        setApiKeyTestSuccess(false)
 
         console.log(
           'Testing API key:',
           settings.whisper.api_key.substring(0, 10) + '...'
         )
 
-        // Test API key by initializing the Whisper client
-        await invoke('init_whisper_client', {
+        // Test the API key with actual OpenAI API call
+        const result = await invoke<string>('test_api_key', {
           apiKey: settings.whisper.api_key,
         })
-        console.log('API key test successful - Whisper client initialized')
+        console.log('API key test successful:', result)
 
-        // Also initialize GPT client with the same API key
-        try {
-          await invoke('init_gpt_client', {
-            apiKey: settings.whisper.api_key,
-          })
-          console.log('GPT client initialized successfully')
-        } catch (gptError) {
-          console.warn(
-            'GPT client initialization failed (non-critical):',
-            gptError
-          )
-        }
-
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 3000)
+        // Show success message indicating the API key is valid
+        setApiKeyTestSuccess(true)
+        setTimeout(() => setApiKeyTestSuccess(false), 5000) // Clear success message after 5 seconds
       } catch (error) {
         console.error('API key test failed:', error)
-        setSaveError(
-          error instanceof Error
-            ? `API key test failed: ${error.message}`
-            : 'API key test failed'
-        )
+        const errorMessage =
+          error instanceof Error ? error.message : 'API key test failed'
+
+        setSaveError(errorMessage)
       } finally {
         setIsTestingApiKey(false)
       }
