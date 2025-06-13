@@ -1,6 +1,6 @@
 import React from 'react'
 import { ReduxProvider } from '../components/ReduxProvider'
-import { AppStateDemo } from '../components/AppStateDemo'
+import AppStateDemo from '../components/AppStateDemo'
 
 /**
  * Example of how to integrate Redux state management into your app

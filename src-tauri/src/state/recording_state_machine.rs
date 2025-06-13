@@ -394,6 +394,22 @@ impl AppStateMachine {
             }
 
             // === FROM PROCESSING STATES ===
+            (AppState::ProcessingTranscription { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(self.current_state.clone()),
+                })
+            }
+            (AppState::ProcessingGPTFormatting { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(self.current_state.clone()),
+                })
+            }
+            (AppState::ProcessingClipboard { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(self.current_state.clone()),
+                })
+            }
+
             (
                 AppState::ProcessingTranscription { .. },
                 AppEvent::TranscriptionComplete { transcript },
@@ -478,6 +494,11 @@ impl AppStateMachine {
             }),
 
             // === FROM PROCESSING COMPLETE ===
+            (AppState::ProcessingComplete { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(self.current_state.clone()),
+                })
+            }
             (AppState::ProcessingComplete { .. }, AppEvent::StartRecording) => {
                 Ok(AppState::Recording {
                     started_at: current_time,
@@ -504,6 +525,10 @@ impl AppStateMachine {
             // === FROM SETTINGS WINDOW ===
             (AppState::SettingsWindowOpen { previous_state }, AppEvent::CloseSettingsWindow) => {
                 Ok(*previous_state.clone())
+            }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::SelectProfile { .. }) => {
+                // Profile selection is allowed from settings window - state doesn't change
+                Ok(self.current_state.clone())
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::StartNewProfile) => {
                 Ok(AppState::NewProfileEditorOpen {
@@ -731,6 +756,22 @@ impl AppStateMachine {
             }
 
             // === FROM PROCESSING STATES ===
+            (AppState::ProcessingTranscription { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(current_state.clone()),
+                })
+            }
+            (AppState::ProcessingGPTFormatting { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(current_state.clone()),
+                })
+            }
+            (AppState::ProcessingClipboard { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(current_state.clone()),
+                })
+            }
+
             (
                 AppState::ProcessingTranscription { .. },
                 AppEvent::TranscriptionComplete { transcript },
@@ -815,6 +856,11 @@ impl AppStateMachine {
             }),
 
             // === FROM PROCESSING COMPLETE ===
+            (AppState::ProcessingComplete { .. }, AppEvent::OpenSettingsWindow) => {
+                Ok(AppState::SettingsWindowOpen {
+                    previous_state: Box::new(current_state.clone()),
+                })
+            }
             (AppState::ProcessingComplete { .. }, AppEvent::StartRecording) => {
                 Ok(AppState::Recording {
                     started_at: current_time,
@@ -841,6 +887,10 @@ impl AppStateMachine {
             // === FROM SETTINGS WINDOW ===
             (AppState::SettingsWindowOpen { previous_state }, AppEvent::CloseSettingsWindow) => {
                 Ok(*previous_state.clone())
+            }
+            (AppState::SettingsWindowOpen { .. }, AppEvent::SelectProfile { .. }) => {
+                // Profile selection is allowed from settings window - state doesn't change
+                Ok(current_state.clone())
             }
             (AppState::SettingsWindowOpen { .. }, AppEvent::StartNewProfile) => {
                 Ok(AppState::NewProfileEditorOpen {

@@ -1,23 +1,15 @@
 import { useCallback } from 'react'
 import { useSystemTray } from './hooks/useSystemTray'
 import { useBackendCommands } from './hooks/useBackendCommands'
-import { useAppSelector } from './store/hooks'
 import { invoke } from '@tauri-apps/api/core'
 
 export function useAppViewModel() {
   const { initializeTray, updateTrayStatus, hideWindow } = useSystemTray()
   const { loadProfiles } = useBackendCommands()
 
-  // Use Redux state instead of URL-based detection
-  const windowState = useAppSelector((state) => state.app.windowState)
-  const isSettingsWindow = windowState.settingsWindow.visible
-
   const closeSettings = useCallback(() => {
     invoke('close_settings_window').catch(console.error)
   }, [])
-
-  // Remove URL-based window type detection - use Redux state machine events instead
-  // Window selection is now driven by backend state machine through Redux
 
   const handleTrayStartRecording = useCallback(() => {
     console.log('Starting recording from tray')
@@ -114,9 +106,6 @@ export function useAppViewModel() {
   ])
 
   return {
-    state: {
-      isSettingsWindow,
-    },
     actions: {
       closeSettings,
     },
