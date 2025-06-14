@@ -7,10 +7,10 @@
 //!
 //! ```rust,no_run
 //! use std::sync::Arc;
-//! use dicta_clerk_lib::services::{SizeGuard, StubNotifier};
+//! use dicta_clerk_lib::services::{SizeGuard, MockNotifierService};
 //!
-//! // Create notifier service (will be real implementation in issue #16)
-//! let notifier = Arc::new(StubNotifier::new());
+//! // Create notifier service for testing (use TauriNotifierService in production)
+//! let notifier = Arc::new(MockNotifierService::new());
 //!
 //! // Create SizeGuard with default 23MB threshold
 //! let mut size_guard = SizeGuard::new(notifier);
@@ -122,7 +122,7 @@ impl SizeGuard {
         sender
     }
 
-    /// Internal method to monitor encoding events and trigger warnings
+    /// Background task that monitors encoding events and sends warnings
     async fn monitor_encoding_events(
         mut receiver: mpsc::UnboundedReceiver<EncodingEvent>,
         notifier: Arc<dyn Notifier>,
@@ -143,7 +143,7 @@ impl SizeGuard {
                             .unwrap_or(true)
                     {
                         // Successfully set the flag, send the warning
-                        if let Err(e) = notifier.warn(&message).await {
+                        if let Err(e) = notifier.warning(&message).await {
                             eprintln!("Failed to send size warning: {}", e);
                         }
                     }
@@ -156,7 +156,7 @@ impl SizeGuard {
                             .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
                             .unwrap_or(true)
                     {
-                        if let Err(e) = notifier.warn(&message).await {
+                        if let Err(e) = notifier.warning(&message).await {
                             eprintln!("Failed to send size warning: {}", e);
                         }
                     }
@@ -197,7 +197,7 @@ impl SizeGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::StubNotifier;
+    use crate::services::MockNotifierService;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use tokio::time::{sleep, Duration};
@@ -227,33 +227,22 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Notifier for TestNotifier {
-        async fn warn(
+        async fn notify(
             &self,
+            level: crate::services::NotificationLevel,
             message: &str,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-            self.warn_count.fetch_add(1, Ordering::Relaxed);
-            *self.last_message.lock().await = message.to_string();
-            Ok(())
-        }
-
-        async fn info(
-            &self,
-            _message: &str,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-            Ok(())
-        }
-
-        async fn error(
-            &self,
-            _message: &str,
-        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        ) -> crate::services::NotifierResult<()> {
+            if level == crate::services::NotificationLevel::Warning {
+                self.warn_count.fetch_add(1, Ordering::Relaxed);
+                *self.last_message.lock().await = message.to_string();
+            }
             Ok(())
         }
     }
 
     #[tokio::test]
     async fn test_size_guard_creation() {
-        let notifier = Arc::new(StubNotifier::new());
+        let notifier = Arc::new(MockNotifierService::new());
         let size_guard = SizeGuard::new(notifier);
 
         assert_eq!(size_guard.threshold_bytes(), 23 * 1024 * 1024);
@@ -266,7 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_size_guard_with_custom_config() {
-        let notifier = Arc::new(StubNotifier::new());
+        let notifier = Arc::new(MockNotifierService::new());
         let config = SizeGuardConfig {
             threshold_bytes: 10 * 1024 * 1024, // 10MB
             warning_message: "Custom warning message".to_string(),

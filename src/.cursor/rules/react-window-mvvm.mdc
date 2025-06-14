@@ -1,0 +1,33 @@
+---
+description: Enforce MVVM for React Window or Page components; views are logic-free, use a single ViewModel hook
+globs: *.tsx
+alwaysApply: false
+---
+
+# React Page MVVM
+
+## Non-negotiable requirements
+- View component **calls exactly one** custom hook whose name matches `use[A-Z].*ViewModel`.
+- View **never** contains control-flow constructs (`if`, `for`, `while`, `switch`) or local state hooks (`useState`, `useReducer`, etc.).
+- View **may have one** `useEffect(() => onMount(), [])` whose sole purpose is to invoke `onMount` from the ViewModel.
+- ViewModel **returns** `{ state, actions, onMount }`; each action name must reflect the user’s intent (e.g., `submitLogin`, `setEmail`).
+
+## Valid example
+```tsx
+// src/pages/LoginWindow.tsx
+import { useEffect } from "react";
+import { useLoginWindowViewModel } from "./loginWindow.viewModel";
+
+export default function LoginWindow() {
+  const { state, actions, onMount } = useLoginWindowViewModel();
+  useEffect(onMount, []);          // only allowed side-effect
+  return (
+    <form onSubmit={actions.submitLogin}>
+      <input type="email" value={state.email}
+             onChange={e => actions.setEmail(e.target.value)} />
+      <input type="password" value={state.password}
+             onChange={e => actions.setPassword(e.target.value)} />
+      <button type="submit">Log in</button>
+    </form>
+  );
+}

@@ -6,7 +6,7 @@ Voice transcription tool built with Tauri, React, and TypeScript.
 
 - **Frontend**: React 19.1, TypeScript 5.8.3, Vite 6.3.5
 - **Backend**: Tauri 2.2.0, Rust 1.77.2
-- **Audio**: OGG/Opus encoding with native libraries
+- **Audio**: OGG/Vorbis encoding with native libraries
 - **Linting**: ESLint 9.17.0, Prettier 3.4.2
 
 ## Prerequisites
@@ -19,15 +19,15 @@ Install system dependencies for Tauri and audio encoding:
 # Ubuntu/Debian
 sudo apt update
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
-  cmake build-essential pkg-config libogg-dev libopus-dev libasound2-dev
+  cmake build-essential pkg-config libogg-dev libvorbis-dev libvorbisenc-dev libasound2-dev
 
 # Fedora
 sudo dnf install webkit2gtk4.1-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel \
-  cmake gcc-c++ pkgconf-devel libogg-devel opus-devel alsa-lib-devel
+  cmake gcc-c++ pkgconf-devel libogg-devel libvorbis-devel alsa-lib-devel
 
 # Arch Linux
 sudo pacman -S webkit2gtk-4.1 gtk3 libappindicator-gtk3 librsvg \
-  cmake gcc pkgconf libogg opus alsa-lib
+  cmake gcc pkgconf libogg libvorbis alsa-lib
 ```
 
 ### CMake Requirements
@@ -36,7 +36,7 @@ The audio encoder requires CMake for building native dependencies:
 
 - **CMake 3.16+** (included in the installation commands above)
 - **libogg-dev/libogg-devel**: OGG container format library
-- **libopus-dev/opus-devel**: Opus audio codec library
+- **libvorbis-dev/libvorbis-devel**: Vorbis audio codec library
 - **libasound2-dev/alsa-lib-devel**: ALSA audio system library (required by cpal)
 
 These libraries are automatically linked during the Rust build process via the `build.rs` script.
@@ -127,7 +127,7 @@ cargo test --test integration_test
 
 ### Audio Encoding
 
-- WAV to OGG/Opus conversion
+- WAV to OGG/Vorbis conversion
 - 32 kbps target bitrate optimized for voice
 - Real-time size forecasting (≤2% accuracy)
 - Progress reporting and size limit warnings
@@ -145,7 +145,7 @@ pnpm tauri --info # ensure we have all correctly setup
 ### Common Issues
 
 - **CMake not found**: Install CMake using the system package manager
-- **Audio library linking errors**: Ensure libogg-dev, libopus-dev, and libasound2-dev are installed
+- **Audio library linking errors**: Ensure libogg-dev, libvorbis-dev, and libasound2-dev are installed
 - **ALSA errors**: Install libasound2-dev (Ubuntu/Debian) or alsa-lib-devel (Fedora/CentOS)
 - **Build failures**: Check that all system dependencies are properly installed
 - **Pre-commit hooks failing**: Run `cargo fmt` and `cargo clippy --fix` in `src-tauri/` directory

@@ -1,0 +1,5 @@
+{
+  "whisper": {
+    "endpoint": "https://api.openai.com/v1/audio/transcriptions"
+  }
+}

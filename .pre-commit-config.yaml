@@ -25,6 +25,15 @@ repos:
         pass_filenames: false
         description: Run Rust tests
 
+      - id: cleanup-builds
+        name: Cleanup Old Builds
+        entry: bash -c 'if [ -f scripts/cleanup-builds.sh ]; then ./scripts/cleanup-builds.sh 3; fi'
+        language: system
+        files: Cargo\.(toml|lock)$
+        pass_filenames: false
+        description: Clean up old Rust build artifacts
+        stages: [pre-push]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:

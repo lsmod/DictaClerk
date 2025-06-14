@@ -1,61 +1,92 @@
-import { useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { useEffect, useState, useCallback } from 'react'
+import { ReduxProvider } from './components/ReduxProvider'
+import MainWindow from './windows/MainWindow'
+import SettingsWindow from './windows/SettingsWindow'
+import { useAppViewModel } from './app.viewModel'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState('')
-  const [name, setName] = useState('')
+function AppContent() {
+  const { onMount } = useAppViewModel()
+  const [windowLabel, setWindowLabel] = useState<string>('')
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke('greet', { name }))
+  console.log('🏠 [APP] AppContent render:', {
+    windowLabel,
+    isInitialized,
+    hasOnMount: !!onMount,
+  })
+
+  // Stable window detection that only runs once
+  const detectWindow = useCallback(async () => {
+    if (windowLabel) return // Already detected
+
+    try {
+      console.log('🔍 [APP] Detecting current window...')
+      const currentWindow = getCurrentWindow()
+      const label = currentWindow.label
+      console.log('✅ [APP] Current window detected:', label)
+      setWindowLabel(label)
+    } catch (error) {
+      console.error('❌ [APP] Failed to get current window:', error)
+      // Default to main window if detection fails
+      console.log('📋 [APP] Defaulting to main window')
+      setWindowLabel('main')
+    }
+  }, [windowLabel])
+
+  // Detect window only once on mount
+  useEffect(() => {
+    console.log(
+      '🔥 [APP] Window detection useEffect ENTRY - this should always appear!'
+    )
+    detectWindow()
+  }, [detectWindow])
+
+  // Initialize app only once for main window
+  useEffect(() => {
+    console.log(
+      '🔥 [APP] Main window useEffect ENTRY - this should always appear!'
+    )
+    console.log('🔍 [APP] useEffect conditions:', {
+      windowLabel,
+      isMainWindow: windowLabel === 'main',
+      isInitialized,
+      shouldInitialize: windowLabel && windowLabel === 'main' && !isInitialized,
+    })
+
+    if (windowLabel && windowLabel === 'main' && !isInitialized) {
+      console.log('🚀 [APP] Running onMount for main window...')
+      const cleanup = onMount()
+      setIsInitialized(true)
+      console.log('✅ [APP] Main window initialization completed')
+
+      return cleanup
+    }
+  }, [windowLabel, isInitialized, onMount])
+
+  // Show loading until we know which window we're in
+  if (!windowLabel) {
+    console.log('⏳ [APP] Loading - window not detected yet')
+    return <div>Loading...</div>
   }
 
-  return (
-    <main className="container">
-      <h1>Welcome to DictaClerk</h1>
+  // Route to appropriate window component based on window label
+  if (windowLabel === 'settings') {
+    console.log('⚙️ [APP] Rendering SettingsWindow')
+    return <SettingsWindow />
+  }
 
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
-          <img
-            src="/src/assets/vite.svg"
-            className="logo vite"
-            alt="Vite logo"
-          />
-        </a>
-        <a href="https://tauri.app" target="_blank" rel="noreferrer">
-          <img
-            src="/src/assets/tauri.svg"
-            className="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noreferrer">
-          <img
-            src="/src/assets/react.svg"
-            className="logo react"
-            alt="React logo"
-          />
-        </a>
-      </div>
-      <p>Voice transcription tool - DictaClerk scaffold setup complete!</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault()
-          greet()
-        }}
-      >
-        <input
-          value={name}
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  )
+  // Default to MainWindow for 'main' window or any other window
+  console.log('🏠 [APP] Rendering MainWindow')
+  return <MainWindow />
 }
 
-export default App
+export default function App() {
+  console.log('🌟 [APP] App component render - ENTRY')
+
+  return (
+    <ReduxProvider>
+      <AppContent />
+    </ReduxProvider>
+  )
+}

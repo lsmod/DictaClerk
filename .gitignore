@@ -16,8 +16,7 @@ dist-ssr
 coverage
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea
 .DS_Store
 *.suo
@@ -25,3 +24,23 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Personal configuration files
+.bashrc_aliases
+scripts/setup-aliases.sh
+
+# Rust target directory (if accidentally created locally)
+src-tauri/target/
+
+# Temporary build directories
+/tmp/rust-builds/
+
+# Personal environment files
+.env.local
+.env.personal
+
+# Settings files with sensitive information
+settings.json
+profiles.json
+
+# Note: .example files (settings.json.example, profiles.json.example) are kept in git for reference

@@ -1,4 +1,4 @@
-use crate::audio::{Encoder, OggOpusEncoder};
+use crate::audio::{Encoder, OggVorbisEncoder};
 use crate::services::{OpenAIWhisperClient, TranscriptionResponse, WhisperClient, WhisperError};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -7,6 +7,71 @@ use tokio::sync::Mutex;
 
 /// Global state for the Whisper client
 pub type WhisperClientState = Arc<Mutex<Option<Arc<dyn WhisperClient + Send + Sync>>>>;
+
+/// Test API key by making a simple request to OpenAI Chat Completions API
+/// This uses the same endpoint that the GPT formatter uses, so it's a more accurate test
+#[tauri::command]
+pub async fn test_api_key(api_key: String) -> Result<String, String> {
+    if api_key.is_empty() {
+        return Err("API key cannot be empty".to_string());
+    }
+
+    if !api_key.starts_with("sk-") {
+        return Err("Invalid API key format. OpenAI API keys should start with 'sk-'".to_string());
+    }
+
+    // Create a temporary client for testing
+    let client = reqwest::Client::new();
+
+    // Test the API key by making a minimal chat completion request
+    // This is the same endpoint the app uses for GPT formatting
+    let test_request = serde_json::json!({
+        "model": "gpt-4o",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Test"
+            }
+        ],
+        "max_tokens": 5,
+        "temperature": 0.0
+    });
+
+    let response = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .header("User-Agent", "DictaClerk/1.0")
+        .timeout(std::time::Duration::from_secs(10))
+        .json(&test_request)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    match response.status() {
+        reqwest::StatusCode::OK => Ok("API key is valid and working".to_string()),
+        reqwest::StatusCode::UNAUTHORIZED => {
+            Err("Invalid API key. Please check your OpenAI API key".to_string())
+        }
+        reqwest::StatusCode::FORBIDDEN => Err("API key lacks necessary permissions".to_string()),
+        reqwest::StatusCode::TOO_MANY_REQUESTS => {
+            Err("API rate limit exceeded. Please try again later".to_string())
+        }
+        reqwest::StatusCode::BAD_REQUEST => {
+            // Try to get more specific error information for 400 errors
+            let error_text = response.text().await.unwrap_or_default();
+            if error_text.contains("model") {
+                Err("API key doesn't have access to GPT-4o model. Please check your API key permissions".to_string())
+            } else {
+                Err(format!("Bad request: {}", error_text))
+            }
+        }
+        status => {
+            let error_text = response.text().await.unwrap_or_default();
+            Err(format!("API error ({}): {}", status, error_text))
+        }
+    }
+}
 
 /// Initialize the Whisper client with API key
 #[tauri::command]
@@ -60,22 +125,133 @@ pub async fn transcribe_recorded_audio(
     if let Some(ref client) = *state_guard {
         let wav_path = PathBuf::from(wav_file_path);
 
+        // Debug: Check WAV file details
+        eprintln!("🔍 DEBUG: Input WAV file analysis:");
+        eprintln!("   📁 WAV path: {:?}", wav_path);
+        eprintln!(
+            "   📁 WAV absolute path: {:?}",
+            wav_path.canonicalize().unwrap_or_else(|_| wav_path.clone())
+        );
+
+        match tokio::fs::metadata(&wav_path).await {
+            Ok(metadata) => {
+                eprintln!(
+                    "   📊 WAV file size: {} bytes ({:.2} KB)",
+                    metadata.len(),
+                    metadata.len() as f64 / 1024.0
+                );
+                eprintln!("   ✅ WAV file exists and is readable");
+            }
+            Err(e) => {
+                eprintln!("   ❌ WAV file error: {}", e);
+                return Err(format!("WAV file not accessible: {}", e));
+            }
+        }
+
         // Step 1: Encode WAV to OGG
-        let encoder = OggOpusEncoder::new();
+        eprintln!("🎵 Step 1: Starting WAV to OGG encoding...");
+        let encoder = OggVorbisEncoder::new();
         let ogg_info = encoder
             .encode(&wav_path, None, None)
             .await
             .map_err(|e| format!("Encoding failed: {}", e))?;
 
+        // Debug: Check OGG file details
+        eprintln!("🔍 DEBUG: Output OGG file analysis:");
+        eprintln!("   📁 OGG path: {:?}", ogg_info.path);
+        eprintln!(
+            "   📁 OGG absolute path: {:?}",
+            ogg_info
+                .path
+                .canonicalize()
+                .unwrap_or_else(|_| ogg_info.path.clone())
+        );
+        eprintln!(
+            "   📊 OGG estimated size: {} bytes ({:.2} KB)",
+            ogg_info.size_estimate,
+            ogg_info.size_estimate as f64 / 1024.0
+        );
+
+        if let Some(actual_size) = ogg_info.actual_size {
+            eprintln!(
+                "   📊 OGG actual size: {} bytes ({:.2} KB)",
+                actual_size,
+                actual_size as f64 / 1024.0
+            );
+        }
+
+        match tokio::fs::metadata(&ogg_info.path).await {
+            Ok(metadata) => {
+                eprintln!(
+                    "   📊 OGG file system size: {} bytes ({:.2} KB)",
+                    metadata.len(),
+                    metadata.len() as f64 / 1024.0
+                );
+                eprintln!("   ✅ OGG file exists and is readable");
+
+                // Check file extension
+                if let Some(extension) = ogg_info.path.extension() {
+                    eprintln!("   🏷️  OGG file extension: {:?}", extension);
+                } else {
+                    eprintln!("   ⚠️  OGG file has no extension");
+                }
+            }
+            Err(e) => {
+                eprintln!("   ❌ OGG file error: {}", e);
+                return Err(format!("OGG file not accessible after encoding: {}", e));
+            }
+        }
+
+        // Try to determine file type using file command (if available)
+        if let Ok(output) = std::process::Command::new("file")
+            .arg(&ogg_info.path)
+            .output()
+        {
+            if let Ok(file_info) = String::from_utf8(output.stdout) {
+                eprintln!("   🔍 File type detection: {}", file_info.trim());
+            }
+        }
+
+        eprintln!("🎵 Encoding completed successfully!");
+        eprintln!("📂 Files for manual inspection:");
+        eprintln!("   Input WAV:  {:?}", wav_path);
+        eprintln!("   Output OGG: {:?}", ogg_info.path);
+        eprintln!("💡 You can now examine these files with audio tools");
+
         // Step 2: Transcribe the OGG file
+        eprintln!("🤖 Step 2: Starting transcription...");
+        eprintln!("   📁 Sending file: {:?}", ogg_info.path);
+        eprintln!("   🎯 Using prompt: {:?}", prompt);
+
         let transcript = client
             .transcribe(&ogg_info.path, prompt)
             .await
-            .map_err(|e| format!("Transcription failed: {}", e))?;
+            .map_err(|e| {
+                eprintln!("❌ Transcription failed for file: {:?}", ogg_info.path);
+                eprintln!("❌ Error details: {}", e);
+                format!("Transcription failed: {}", e)
+            })?;
 
-        // Step 3: Clean up the temporary OGG file (optional)
+        eprintln!("✅ Transcription successful!");
+        eprintln!("   📝 Text length: {} characters", transcript.text.len());
+        eprintln!(
+            "   📝 First 100 chars: {:?}",
+            transcript.text.chars().take(100).collect::<String>()
+        );
+
+        // Step 3: Clean up the temporary OGG file (but warn first)
+        eprintln!("🧹 Step 3: Cleaning up temporary OGG file...");
+        eprintln!("   ⚠️  About to delete: {:?}", ogg_info.path);
+        eprintln!("   💡 If you want to keep the file for inspection, interrupt now!");
+
+        // Give a moment for the user to see the message
+        tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+
         if let Err(e) = tokio::fs::remove_file(&ogg_info.path).await {
-            eprintln!("Warning: Failed to clean up temporary OGG file: {}", e);
+            eprintln!("⚠️  Warning: Failed to clean up temporary OGG file: {}", e);
+            eprintln!("   📁 File remains at: {:?}", ogg_info.path);
+        } else {
+            eprintln!("✅ Temporary OGG file cleaned up");
         }
 
         Ok(transcript)
@@ -88,7 +264,7 @@ pub async fn transcribe_recorded_audio(
 #[tauri::command]
 pub fn get_whisper_info() -> serde_json::Value {
     serde_json::json!({
-        "supported_formats": ["OGG/Opus"],
+        "supported_formats": ["OGG/Vorbis"],
         "max_file_size_mb": 25,
         "max_duration_seconds": 600,
         "models": ["whisper-1"],
