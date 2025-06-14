@@ -89,12 +89,10 @@
     color: #00ffcc;
     margin: 0;
     padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    /* Borderless window adjustments */
-    overflow: hidden;
+    width: 100vw; /* Ensure body fills full window width */
+    height: 100vh; /* Ensure body fills full window height */
+    overflow: hidden; /* Prevent scrollbars */
+    box-sizing: border-box; /* Include borders in dimensions */
   }
 }
 
@@ -152,30 +150,32 @@
 
 /* Synthétiseur Interface Styles - Adjusted for borderless window */
 .synth-interface {
-  width: 100%;
-  max-width: 300px;
+  width: 100vw;
   height: 100vh;
-  max-height: 200px;
   background: linear-gradient(145deg, #101010, #1a1a1a);
   border: 1px solid #333;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 12px;
   box-shadow:
-    0 0 15px rgba(0, 255, 204, 0.2),
-    inset 0 1px 3px rgba(255, 255, 255, 0.1);
+    0 0 25px rgba(0, 255, 204, 0.4),
+    inset 0 1px 3px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 3px rgba(0, 255, 204, 0.1);
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  transition: all 0.2s ease; /* Smooth transition for hover effects */
+  justify-content: stretch;
+  transition: all 0.2s ease;
+  margin: 0;
+  box-sizing: border-box;
 }
 
-/* Subtle hover effect for draggable window */
+/* Enhanced hover effect for draggable window */
 .synth-interface[data-tauri-drag-region]:hover {
-  border-color: rgba(0, 255, 204, 0.3);
+  border-color: rgba(0, 255, 204, 0.5);
   box-shadow:
-    0 0 20px rgba(0, 255, 204, 0.25),
-    inset 0 1px 3px rgba(255, 255, 255, 0.1);
+    0 0 35px rgba(0, 255, 204, 0.5),
+    inset 0 1px 3px rgba(255, 255, 255, 0.2),
+    inset 0 -1px 3px rgba(0, 255, 204, 0.2);
 }
 
 /* Header avec settings - Compact for borderless */
@@ -417,6 +417,8 @@
   transition: all 0.3s ease;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   border: 2px solid;
+  margin-top: 8px;
+  margin-right: 4px;
 }
 
 /* Ready state (not recording) - Record button */
@@ -726,8 +728,9 @@
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .synth-interface {
-    width: 95%;
-    max-width: 420px;
+    width: 100vw; /* Maintain full width on mobile */
+    height: 100vh; /* Maintain full height on mobile */
+    padding: 8px; /* Slightly less padding on mobile */
   }
 }
 

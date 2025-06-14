@@ -15,8 +15,8 @@
       {
         "label": "main",
         "title": "DictaClerk",
-        "width": 500,
-        "height": 300,
+        "width": 425,
+        "height": 188,
         "decorations": false,
         "alwaysOnTop": true,
         "resizable": true

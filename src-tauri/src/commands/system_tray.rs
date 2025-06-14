@@ -236,7 +236,7 @@ pub async fn open_settings_window(
         tauri::WebviewUrl::App("index.html".into()),
     )
     .title("DictaClerk Settings")
-    .inner_size(600.0, 700.0)
+    .inner_size(600.0, 750.0)
     .min_inner_size(500.0, 600.0)
     .center()
     .focused(true)
