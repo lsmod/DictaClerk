@@ -53,6 +53,54 @@ export interface BackendCommands {
 
 // Setup backend event listeners and return command interface
 export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
+  // Define loadProfiles function
+  const loadProfilesImpl = async () => {
+    try {
+      dispatch(setProfilesLoading(true))
+      dispatch(setProfilesError(null))
+
+      console.log('Loading profiles via Redux...')
+      const profileData = await invoke<ProfileCollection>('load_profiles')
+      console.log('Loaded profile data via Redux:', profileData)
+
+      dispatch(setProfiles(profileData.profiles))
+
+      // Set active profile to clipboard profile (ID "1") first, then fallback to default or first active profile
+      const clipboardProfile = profileData.profiles.find((p) => p.id === '1')
+      const defaultProfile = profileData.profiles.find(
+        (p) => p.id === profileData.default_profile_id
+      )
+      const activeProfile =
+        clipboardProfile ||
+        defaultProfile ||
+        profileData.profiles.find((p) => p.active)
+
+      if (activeProfile) {
+        dispatch(setActiveProfile(activeProfile.id))
+        console.log('Set active profile ID via Redux:', activeProfile.id)
+      } else {
+        console.warn('No active profile found')
+      }
+    } catch (error) {
+      console.error('Failed to load profiles via Redux:', error)
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load profiles'
+      dispatch(setProfilesError(errorMessage))
+
+      // Add detailed error
+      const detailedError: AppError = {
+        type: 'profile-validation',
+        message: errorMessage,
+        recoverable: true,
+        timestamp: Date.now(),
+        context: { operation: 'load_profiles', error: String(error) },
+      }
+      dispatch(addError(detailedError))
+    } finally {
+      dispatch(setProfilesLoading(false))
+    }
+  }
+
   // Listen to backend state machine events
   const setupEventListeners = async () => {
     try {
@@ -200,6 +248,19 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
             visible: event.payload.settings_window.visible,
             focused: false, // Default value
           }
+
+          // If settings window is closing and main window is becoming visible, refresh profiles
+          if (
+            !event.payload.settings_window.visible &&
+            event.payload.main_window?.visible
+          ) {
+            // Trigger profile reload with a small delay to ensure settings have been saved
+            setTimeout(() => {
+              dispatch(setProfilesLoading(true))
+              // Use the loadProfiles command from the backend sync
+              loadProfilesImpl()
+            }, 100)
+          }
         }
 
         if (event.payload.profile_editor_window) {
@@ -218,6 +279,27 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
       await listen<{ profile_id: string }>('selectProfile', (event) => {
         console.log('Profile selected via shortcut:', event.payload)
         dispatch(profileSelected(event.payload))
+      })
+
+      // Listen for profiles-updated events from backend
+      await listen<ProfileCollection>('profiles-updated', (event) => {
+        dispatch(setProfiles(event.payload.profiles))
+
+        // Set active profile to clipboard profile (ID "1") first, then fallback to default or first active profile
+        const clipboardProfile = event.payload.profiles.find(
+          (p) => p.id === '1'
+        )
+        const defaultProfile = event.payload.profiles.find(
+          (p) => p.id === event.payload.default_profile_id
+        )
+        const activeProfile =
+          clipboardProfile ||
+          defaultProfile ||
+          event.payload.profiles.find((p) => p.active)
+
+        if (activeProfile) {
+          dispatch(setActiveProfile(activeProfile.id))
+        }
       })
 
       // Listen for auto-recovery events
@@ -463,52 +545,7 @@ export const setupBackendSync = (dispatch: AppDispatch): BackendCommands => {
     },
 
     // Profile management commands
-    loadProfiles: async () => {
-      try {
-        dispatch(setProfilesLoading(true))
-        dispatch(setProfilesError(null))
-
-        console.log('Loading profiles via Redux...')
-        const profileData = await invoke<ProfileCollection>('load_profiles')
-        console.log('Loaded profile data via Redux:', profileData)
-
-        dispatch(setProfiles(profileData.profiles))
-
-        // Set active profile to clipboard profile (ID "1") first, then fallback to default or first active profile
-        const clipboardProfile = profileData.profiles.find((p) => p.id === '1')
-        const defaultProfile = profileData.profiles.find(
-          (p) => p.id === profileData.default_profile_id
-        )
-        const activeProfile =
-          clipboardProfile ||
-          defaultProfile ||
-          profileData.profiles.find((p) => p.active)
-
-        if (activeProfile) {
-          dispatch(setActiveProfile(activeProfile.id))
-          console.log('Set active profile ID via Redux:', activeProfile.id)
-        } else {
-          console.warn('No active profile found')
-        }
-      } catch (error) {
-        console.error('Failed to load profiles via Redux:', error)
-        const errorMessage =
-          error instanceof Error ? error.message : 'Failed to load profiles'
-        dispatch(setProfilesError(errorMessage))
-
-        // Add detailed error
-        const detailedError: AppError = {
-          type: 'profile-validation',
-          message: errorMessage,
-          recoverable: true,
-          timestamp: Date.now(),
-          context: { operation: 'load_profiles', error: String(error) },
-        }
-        dispatch(addError(detailedError))
-      } finally {
-        dispatch(setProfilesLoading(false))
-      }
-    },
+    loadProfiles: loadProfilesImpl,
 
     selectProfile: async (profileId: string) => {
       try {

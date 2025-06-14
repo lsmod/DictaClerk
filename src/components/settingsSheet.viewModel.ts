@@ -516,68 +516,47 @@ export function useSettingsSheetViewModel(onClose: () => void) {
     // Profile actions
     saveProfile: async (profile: Profile) => {
       try {
-        // Find existing profile or add new one
-        const existingProfileIndex = profiles.findIndex(
+        setIsSaving(true)
+        setSaveError(null)
+
+        const updatedProfiles = [...profiles]
+        const existingIndex = updatedProfiles.findIndex(
           (p) => p.id === profile.id
         )
-        let updatedProfiles: Profile[]
-        let isNewProfile = false
 
-        if (existingProfileIndex >= 0 && profile.id) {
-          // Update existing profile
-          updatedProfiles = [...profiles]
-          updatedProfiles[existingProfileIndex] = {
+        if (existingIndex !== -1) {
+          updatedProfiles[existingIndex] = {
             ...profile,
             updated_at: new Date().toISOString(),
           }
         } else {
-          // Add new profile - generate ID if not present
-          isNewProfile = true
-          const newProfile = {
+          updatedProfiles.push({
             ...profile,
-            id: profile.id || Date.now().toString(),
+            id: crypto.randomUUID(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          }
-          updatedProfiles = [...profiles, newProfile]
+          })
         }
 
-        // Save to backend
-        const profileCollection: ProfileCollection = {
+        const profileCollection = {
           profiles: updatedProfiles,
-          default_profile_id:
-            profiles.find((p) => p.active)?.id || updatedProfiles[0]?.id || '',
+          default_profile_id: '1',
         }
 
         await invoke('save_profiles', { profiles: profileCollection })
-
-        // Reload profiles to sync with backend
         await loadProfiles()
 
-        setView('overview')
         setEditingProfile(null)
-
-        // Show success toast
-        toast.success(
-          isNewProfile
-            ? 'Profile created successfully!'
-            : 'Profile updated successfully!',
-          {
-            description: `Profile "${profile.name}" has been saved.`,
-            duration: 3000,
-          }
-        )
+        setView('overview')
+        toast.success('Profile saved successfully!')
       } catch (error) {
         console.error('Failed to save profile:', error)
-        const errorMessage =
+        setSaveError(
           error instanceof Error ? error.message : 'Failed to save profile'
-        setSaveError(errorMessage)
-
-        // Also show error toast
-        toast.error('Failed to save profile', {
-          description: errorMessage,
-          duration: 5000,
-        })
+        )
+        toast.error('Failed to save profile')
+      } finally {
+        setIsSaving(false)
       }
     },
     deleteProfile: async (profileId: string) => {

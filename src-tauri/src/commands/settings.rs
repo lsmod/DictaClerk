@@ -360,6 +360,10 @@ pub async fn v1_save_profiles(
             if let Some(backup) = backup_path {
                 let _ = tokio::fs::remove_file(backup).await;
             }
+
+            // Emit profiles-updated event to notify all windows of the change
+            let _ = app_handle.emit("profiles-updated", &profiles);
+
             Ok(format!(
                 "Profiles saved successfully to {}",
                 target_path.display()
