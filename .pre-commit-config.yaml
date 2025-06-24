@@ -1,4 +1,22 @@
 repos:
+  # - repo: local
+  #   hooks:
+  #     - id: pnpm-lint
+  #       name: JavaScript/TypeScript Lint
+  #       entry: bash -c 'pnpm lint'
+  #       language: system
+  #       files: \.(js|jsx|ts|tsx)$
+  #       pass_filenames: false
+  #       description: Run ESLint on JavaScript/TypeScript files
+
+  #     - id: pnpm-test
+  #       name: JavaScript/TypeScript Tests
+  #       entry: bash -c 'pnpm test:run'
+  #       language: system
+  #       files: \.(js|jsx|ts|tsx)$
+  #       pass_filenames: false
+  #       description: Run Vitest tests for JavaScript/TypeScript files
+
   - repo: local
     hooks:
       - id: cargo-fmt
