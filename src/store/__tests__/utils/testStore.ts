@@ -32,7 +32,8 @@ export const createTestStore = (config: TestStoreConfig = {}) => {
 
   if (enableLogging) {
     const originalDispatch = store.dispatch
-    store.dispatch = (action) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    store.dispatch = (action: any) => {
       console.log('Dispatching:', action.type, action.payload)
       const result = originalDispatch(action)
       console.log('New state:', store.getState())
@@ -44,7 +45,22 @@ export const createTestStore = (config: TestStoreConfig = {}) => {
 }
 
 // Test data factories
-export const createMockBackendEvent = (overrides: Partial<any> = {}) => ({
+interface MockBackendEvent {
+  previous_state: string
+  current_state: string
+  event: string
+  timestamp: number
+  context: {
+    is_recording: boolean
+    is_processing: boolean
+    main_window_visible: boolean
+    has_modal_window: boolean
+  }
+}
+
+export const createMockBackendEvent = (
+  overrides: Partial<MockBackendEvent> = {}
+) => ({
   previous_state: 'IdleMainWindowVisible',
   current_state: 'Recording',
   event: 'StartRecording',
@@ -58,7 +74,18 @@ export const createMockBackendEvent = (overrides: Partial<any> = {}) => ({
   ...overrides,
 })
 
-export const createMockProfile = (overrides: Partial<any> = {}) => ({
+interface MockProfile {
+  id: string
+  name: string
+  description: string
+  prompt: string
+  active: boolean
+  visible: boolean
+  created_at: string
+  updated_at: string
+}
+
+export const createMockProfile = (overrides: Partial<MockProfile> = {}) => ({
   id: 'test-profile',
   name: 'Test Profile',
   description: 'Test profile description',
@@ -70,7 +97,15 @@ export const createMockProfile = (overrides: Partial<any> = {}) => ({
   ...overrides,
 })
 
-export const createMockError = (overrides: Partial<any> = {}) => ({
+interface MockError {
+  type: 'transcription' | 'audio' | 'gpt' | 'system'
+  message: string
+  recoverable: boolean
+  timestamp: number
+  context: Record<string, unknown>
+}
+
+export const createMockError = (overrides: Partial<MockError> = {}) => ({
   type: 'transcription' as const,
   message: 'Test error message',
   recoverable: true,
@@ -129,7 +164,7 @@ export const measureActionTime = async (
 // Stress testing helpers
 export const stressTestStateTransitions = (
   store: ReturnType<typeof createTestStore>,
-  transitions: Array<{ type: string; payload?: any }>,
+  transitions: Array<{ type: string; payload?: unknown }>,
   iterations = 1000
 ) => {
   const startTime = performance.now()

@@ -201,7 +201,7 @@ const SettingsSheet: React.FC<SettingsSheetProps> = ({ onClose }) => {
   const firstInputRef = useRef<HTMLInputElement>(null)
   const [isDragActive, setIsDragActive] = useState(false)
 
-  useEffect(onMount, [])
+  useEffect(onMount, [onMount])
 
   // Focus management after successful save
   useEffect(() => {
