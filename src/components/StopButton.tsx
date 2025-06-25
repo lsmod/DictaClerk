@@ -9,7 +9,7 @@ import { useStopButtonViewModel } from './stopButton.viewModel'
 const RecordStopToggleButton: React.FC = () => {
   const { state, actions, onMount } = useStopButtonViewModel()
 
-  useEffect(onMount, [])
+  useEffect(onMount, [onMount])
 
   const getTooltipContent = () => {
     if (state.isProcessing) {

@@ -5,6 +5,9 @@
 /// profile operations, and error handling.
 pub mod recording_state_machine;
 
+#[cfg(test)]
+pub mod tests;
+
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
