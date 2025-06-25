@@ -72,6 +72,8 @@ jobs:
             cmake \
             pkg-config \
             libogg-dev \
+            libvorbis-dev \
+            libvorbisenc-dev \
             libopus-dev \
             libasound2-dev
 
@@ -163,6 +165,8 @@ jobs:
             cmake \
             pkg-config \
             libogg-dev \
+            libvorbis-dev \
+            libvorbisenc-dev \
             libopus-dev \
             libasound2-dev
 
