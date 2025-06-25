@@ -73,7 +73,6 @@ jobs:
             pkg-config \
             libogg-dev \
             libvorbis-dev \
-            libvorbisenc-dev \
             libopus-dev \
             libasound2-dev
 
@@ -166,7 +165,6 @@ jobs:
             pkg-config \
             libogg-dev \
             libvorbis-dev \
-            libvorbisenc-dev \
             libopus-dev \
             libasound2-dev
 
