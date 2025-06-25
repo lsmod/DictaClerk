@@ -19,7 +19,7 @@ Install system dependencies for Tauri and audio encoding:
 # Ubuntu/Debian
 sudo apt update
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
-  cmake build-essential pkg-config libogg-dev libvorbis-dev libvorbisenc-dev libasound2-dev
+  cmake build-essential pkg-config libogg-dev libvorbis-dev libasound2-dev
 
 # Fedora
 sudo dnf install webkit2gtk4.1-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel \
@@ -36,7 +36,7 @@ The audio encoder requires CMake for building native dependencies:
 
 - **CMake 3.16+** (included in the installation commands above)
 - **libogg-dev/libogg-devel**: OGG container format library
-- **libvorbis-dev/libvorbis-devel**: Vorbis audio codec library
+- **libvorbis-dev/libvorbis-devel**: Vorbis audio codec library (includes both encoder and decoder)
 - **libasound2-dev/alsa-lib-devel**: ALSA audio system library (required by cpal)
 
 These libraries are automatically linked during the Rust build process via the `build.rs` script.
