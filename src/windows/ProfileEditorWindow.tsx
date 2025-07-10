@@ -33,7 +33,7 @@ export default function ProfileEditorWindow({
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(onWindowMount, [onWindowMount])
-  useEffect(onMount, [])
+  useEffect(onMount, [onMount])
 
   // Focus management - focus the first input when component mounts
   useEffect(() => {

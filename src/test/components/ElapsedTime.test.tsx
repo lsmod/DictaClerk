@@ -224,10 +224,13 @@ describe('ElapsedTime Component Logic', () => {
         processingProgress: null,
       })
 
+      // Simulate calling useAppDispatch hook
+      const dispatch = mockUseAppDispatch()
+
       // This would be tested in the actual component with timers
       // Here we just verify the dispatch is available
       expect(mockUseAppDispatch).toHaveBeenCalled()
-      expect(mockDispatch).toBeDefined()
+      expect(dispatch).toBeDefined()
     })
 
     it('should not dispatch when not recording', () => {

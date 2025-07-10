@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
 import { useBackendCommands } from '../hooks/useBackendCommands'
 import {
@@ -218,9 +218,9 @@ export const useErrorDisplayViewModel = () => {
     },
   }
 
-  const onMount = () => {
+  const onMount = useCallback(() => {
     // No initialization needed for this component
-  }
+  }, [])
 
   return { state, actions, onMount }
 }

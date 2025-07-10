@@ -22,5 +22,12 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
     },
+  },
+  // Disable react-refresh rule for UI components (shadcn/ui library components)
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   }
 )

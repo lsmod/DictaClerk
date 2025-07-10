@@ -6,7 +6,7 @@ import { AlertCircle, RefreshCcw, X, Copy } from 'lucide-react'
 const ErrorDisplay: React.FC = () => {
   const { state, actions, onMount } = useErrorDisplayViewModel()
 
-  useEffect(onMount, [])
+  useEffect(onMount, [onMount])
 
   return (
     <>

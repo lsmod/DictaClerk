@@ -94,7 +94,7 @@ export const useVolumeVisualizerViewModel = () => {
       }
       isSetupRef.current = false
     }
-  }, []) // Empty dependency array to run only once
+  }, [isBackendRecording, isRecording]) // Dependencies added to fix linting warning
 
   // Listen to state machine events for better synchronization
   useEffect(() => {

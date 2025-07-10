@@ -11,7 +11,7 @@ import { Profile } from '@/store/slices/appSlice'
 const ProfileButtons: React.FC = () => {
   const { state, actions, onMount, canReformat } = useProfileButtonsViewModel()
 
-  useEffect(onMount, [])
+  useEffect(onMount, [onMount])
 
   const ProfileButtonContent = ({ profile }: { profile: Profile }) => {
     return actions.isClipboardProfile(profile.id) ? (

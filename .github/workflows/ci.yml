@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [master, main]
 
+# Note: Signed AppImage releases are handled by .github/workflows/release.yml
+# This workflow handles development builds and testing
+
 env:
   RUST_VERSION: '1.87.0'
   NODE_VERSION: '20.19.2'
@@ -72,6 +75,7 @@ jobs:
             cmake \
             pkg-config \
             libogg-dev \
+            libvorbis-dev \
             libopus-dev \
             libasound2-dev
 
@@ -163,6 +167,7 @@ jobs:
             cmake \
             pkg-config \
             libogg-dev \
+            libvorbis-dev \
             libopus-dev \
             libasound2-dev
 

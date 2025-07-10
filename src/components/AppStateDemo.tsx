@@ -4,7 +4,7 @@ import { useAppStateDemoViewModel } from './appStateDemo.viewModel'
 const AppStateDemo: React.FC = () => {
   const { state, actions, onMount } = useAppStateDemoViewModel()
 
-  useEffect(onMount, [])
+  useEffect(onMount, [onMount])
 
   return (
     <div className="app-state-demo p-6 max-w-4xl mx-auto">

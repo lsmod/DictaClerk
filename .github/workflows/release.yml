@@ -1,0 +1,254 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Triggers on version tags like v1.2.3
+
+env:
+  RUST_VERSION: '1.87.0'
+  NODE_VERSION: '20.19.2'
+  PNPM_VERSION: '9.0.0'
+
+jobs:
+  build-and-release:
+    name: Build and Release Signed AppImage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for creating releases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Setup Rust ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install system dependencies for Tauri and GPG signing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            cmake \
+            pkg-config \
+            libogg-dev \
+            libvorbis-dev \
+            libopus-dev \
+            libasound2-dev \
+            gnupg2 \
+            squashfs-tools
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm tauri build --target x86_64-unknown-linux-gnu
+
+      - name: Setup GPG for signing
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d > private.key
+          gpg --batch --import private.key
+          rm private.key
+
+          # Get the key ID from the imported key
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d/ -f2)
+          echo "key_id=$KEY_ID" >> $GITHUB_OUTPUT
+          echo "GPG key imported: $KEY_ID"
+
+      - name: Find and rename AppImage
+        id: appimage
+        run: |
+          # Find the built AppImage
+          APPIMAGE_PATH=$(find src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/ -name "*.AppImage" | head -1)
+
+          if [ -z "$APPIMAGE_PATH" ]; then
+            echo "Error: No AppImage found!"
+            exit 1
+          fi
+
+          echo "Found AppImage: $APPIMAGE_PATH"
+
+          # Create standardized name
+          STANDARDIZED_NAME="dictaclerk.appimage"
+          STANDARDIZED_PATH="./dictaclerk.appimage"
+
+          # Copy and rename AppImage
+          cp "$APPIMAGE_PATH" "$STANDARDIZED_PATH"
+          chmod +x "$STANDARDIZED_PATH"
+
+          echo "path=$STANDARDIZED_PATH" >> $GITHUB_OUTPUT
+          echo "name=$STANDARDIZED_NAME" >> $GITHUB_OUTPUT
+          echo "Renamed AppImage to: $STANDARDIZED_NAME"
+
+      - name: Sign AppImage
+        env:
+          GPG_PRIVATE_KEY_PASSWORD: ${{ secrets.GPG_PRIVATE_KEY_PASSWORD }}
+        run: |
+          # Sign the AppImage using gpg (handle both passworded and passwordless keys)
+          if [ -n "$GPG_PRIVATE_KEY_PASSWORD" ]; then
+            echo "Signing with password-protected key..."
+            echo "$GPG_PRIVATE_KEY_PASSWORD" | gpg --batch --yes --passphrase-fd 0 --armor --detach-sign "${{ steps.appimage.outputs.path }}"
+          else
+            echo "Signing with passwordless key..."
+            gpg --batch --yes --armor --detach-sign "${{ steps.appimage.outputs.path }}"
+          fi
+
+          # Verify the signature was created
+          if [ -f "${{ steps.appimage.outputs.path }}.asc" ]; then
+            echo "GPG signature created successfully"
+
+            # Verify the signature
+            gpg --verify "${{ steps.appimage.outputs.path }}.asc" "${{ steps.appimage.outputs.path }}"
+            echo "Signature verification completed"
+          else
+            echo "Error: GPG signature file not created"
+            exit 1
+          fi
+
+      - name: Generate checksums
+        id: checksums
+        run: |
+          # Generate SHA256 checksum
+          sha256sum "${{ steps.appimage.outputs.path }}" > "${{ steps.appimage.outputs.path }}.sha256"
+          sha256sum "${{ steps.appimage.outputs.path }}.asc" >> "${{ steps.appimage.outputs.path }}.sha256"
+
+          # Display checksums
+          echo "Generated checksums:"
+          cat "${{ steps.appimage.outputs.path }}.sha256"
+
+          echo "checksum_file=${{ steps.appimage.outputs.path }}.sha256" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << EOF
+          # DictaClerk ${{ steps.version.outputs.tag }}
+
+          ## Downloads
+
+          - **AppImage (Linux)**: [dictaclerk.appimage](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage)
+          - **GPG Signature**: [dictaclerk.appimage.asc](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage.asc)
+          - **Checksums**: [dictaclerk.appimage.sha256](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage.sha256)
+
+          ## Verification
+
+          ### GPG Signature Verification
+          To verify the GPG signature:
+          \`\`\`bash
+          # Download the public key (first time only)
+          curl -L https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk-signing-key.asc | gpg --import
+
+          # Verify the signature
+          gpg --verify dictaclerk.appimage.asc dictaclerk.appimage
+          \`\`\`
+
+          ### Checksum Verification
+          To verify file integrity:
+          \`\`\`bash
+          sha256sum -c dictaclerk.appimage.sha256
+          \`\`\`
+
+          ## Installation
+
+          1. Download the AppImage
+          2. Make it executable: \`chmod +x dictaclerk.appimage\`
+          3. Run: \`./dictaclerk.appimage\`
+
+          ## What's New
+
+          Release ${{ steps.version.outputs.version }} includes various improvements and bug fixes.
+
+          ---
+
+          **Build Information:**
+          - Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          - Commit: ${{ github.sha }}
+          - Rust Version: ${{ env.RUST_VERSION }}
+          - Node Version: ${{ env.NODE_VERSION }}
+          EOF
+
+      - name: Export GPG public key
+        run: |
+          # Export the public key for users
+          gpg --armor --export ${{ steps.gpg.outputs.key_id }} > dictaclerk-signing-key.asc
+          echo "Public key exported for distribution"
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.tag }}
+          name: 'DictaClerk ${{ steps.version.outputs.tag }}'
+          bodyFile: release_notes.md
+          draft: false
+          prerelease: false
+          artifacts: |
+            ${{ steps.appimage.outputs.path }}
+            ${{ steps.appimage.outputs.path }}.asc
+            ${{ steps.checksums.outputs.checksum_file }}
+            dictaclerk-signing-key.asc
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify AppImage executable and signature
+        run: |
+          echo "=== Final Verification ==="
+
+          # Test AppImage is executable
+          file "${{ steps.appimage.outputs.path }}"
+
+          # Verify GPG signature one more time
+          gpg --verify "${{ steps.appimage.outputs.path }}.asc" "${{ steps.appimage.outputs.path }}"
+
+          # Verify checksums
+          sha256sum -c "${{ steps.checksums.outputs.checksum_file }}"
+
+          echo "=== All verifications passed! ==="

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAppSelector } from '../store/hooks'
 import { useBackendCommands } from '../hooks/useBackendCommands'
 import { listen } from '@tauri-apps/api/event'
@@ -53,11 +53,16 @@ export const useStopButtonViewModel = () => {
 
   // Debug logging for button state changes
   useEffect(() => {
+    const currentButtonState = isProcessing
+      ? 'processing'
+      : isRecording
+        ? 'recording'
+        : 'ready'
     console.log('Stop button state update:', {
       reduxStatus: status,
       isRecording,
       isProcessing,
-      buttonState: getButtonState(),
+      buttonState: currentButtonState,
     })
   }, [status, isRecording, isProcessing])
 
@@ -155,11 +160,14 @@ export const useStopButtonViewModel = () => {
     }
   }
 
-  const getButtonState = (): 'processing' | 'recording' | 'ready' => {
+  const getButtonState = useCallback(():
+    | 'processing'
+    | 'recording'
+    | 'ready' => {
     if (isProcessing) return 'processing'
     if (isRecording) return 'recording'
     return 'ready'
-  }
+  }, [isProcessing, isRecording])
 
   const getAriaLabel = (): string => {
     if (isProcessing) return 'Processing recording...'
@@ -186,14 +194,14 @@ export const useStopButtonViewModel = () => {
     handleKeyDown,
   }
 
-  const onMount = () => {
+  const onMount = useCallback(() => {
     console.log('Stop button mounted with initial state:', {
       status,
       isRecording,
       isProcessing,
       buttonState: getButtonState(),
     })
-  }
+  }, [status, isRecording, isProcessing, getButtonState])
 
   return { state, actions, onMount }
 }

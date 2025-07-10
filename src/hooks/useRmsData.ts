@@ -231,7 +231,7 @@ export const useRmsData = (options: UseRmsDataOptions = {}): RmsData => {
       isSubscribedRef.current = false
       isSetupRef.current = false
     }
-  }, []) // Empty dependency array to run only once
+  }, [directUpdate, throttle, throttledUpdate]) // Dependencies added to fix linting warning
 
   // Reset to inactive state when no RMS data received for a while
   useEffect(() => {
