@@ -2,6 +2,12 @@
 
 ## DictaClerk - Voice Transcription & Formatting Tool
 
+## Version 0.9.1
+
+Date: July 11, 2025
+
+- CI: Added automated AppImage, DEB, and RPM packaging with GPG signing, public key export, and checksum verification for secure Linux releases.
+
 ## Version 0.9.0
 
 Date: June 15, 2025
