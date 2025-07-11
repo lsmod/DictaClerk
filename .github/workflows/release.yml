@@ -105,80 +105,145 @@ jobs:
           echo "key_id=$KEY_ID" >> $GITHUB_OUTPUT
           echo "GPG key imported: $KEY_ID"
 
-      - name: Find and rename AppImage
-        id: appimage
+      - name: Find and prepare packages
+        id: packages
         run: |
-          # Find the built AppImage
-          APPIMAGE_PATH=$(find src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/ -name "*.AppImage" | head -1)
+          # Find the built packages - search in multiple possible locations
+          APPIMAGE_PATH=$(find src-tauri/target/ /tmp/rust-builds/ -name "*.AppImage" 2>/dev/null | head -1)
+          DEB_PATH=$(find src-tauri/target/ /tmp/rust-builds/ -name "*.deb" 2>/dev/null | head -1)
+          RPM_PATH=$(find src-tauri/target/ /tmp/rust-builds/ -name "*.rpm" 2>/dev/null | head -1)
 
           if [ -z "$APPIMAGE_PATH" ]; then
             echo "Error: No AppImage found!"
+            echo "Searched in:"
+            echo "  - src-tauri/target/"
+            echo "  - /tmp/rust-builds/"
+            echo "Available files in potential locations:"
+            find src-tauri/target/ /tmp/rust-builds/ -name "*AppImage*" 2>/dev/null || echo "  No AppImage files found"
             exit 1
           fi
 
-          echo "Found AppImage: $APPIMAGE_PATH"
+          echo "Found packages:"
+          echo "  AppImage: $APPIMAGE_PATH"
+          echo "  DEB: $DEB_PATH"
+          echo "  RPM: $RPM_PATH"
 
-          # Create standardized name
-          STANDARDIZED_NAME="dictaclerk.appimage"
-          STANDARDIZED_PATH="./dictaclerk.appimage"
+          # Create standardized names and copy packages
+          APPIMAGE_STANDARDIZED="./dictaclerk.appimage"
+          cp "$APPIMAGE_PATH" "$APPIMAGE_STANDARDIZED"
+          chmod +x "$APPIMAGE_STANDARDIZED"
 
-          # Copy and rename AppImage
-          cp "$APPIMAGE_PATH" "$STANDARDIZED_PATH"
-          chmod +x "$STANDARDIZED_PATH"
+          # Copy DEB package if found
+          if [ -n "$DEB_PATH" ]; then
+            DEB_STANDARDIZED="./dictaclerk.deb"
+            cp "$DEB_PATH" "$DEB_STANDARDIZED"
+            echo "deb_path=$DEB_STANDARDIZED" >> $GITHUB_OUTPUT
+            echo "deb_name=dictaclerk.deb" >> $GITHUB_OUTPUT
+          fi
 
-          echo "path=$STANDARDIZED_PATH" >> $GITHUB_OUTPUT
-          echo "name=$STANDARDIZED_NAME" >> $GITHUB_OUTPUT
-          echo "Renamed AppImage to: $STANDARDIZED_NAME"
+          # Copy RPM package if found
+          if [ -n "$RPM_PATH" ]; then
+            RPM_STANDARDIZED="./dictaclerk.rpm"
+            cp "$RPM_PATH" "$RPM_STANDARDIZED"
+            echo "rpm_path=$RPM_STANDARDIZED" >> $GITHUB_OUTPUT
+            echo "rpm_name=dictaclerk.rpm" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Sign AppImage
+          echo "appimage_path=$APPIMAGE_STANDARDIZED" >> $GITHUB_OUTPUT
+          echo "appimage_name=dictaclerk.appimage" >> $GITHUB_OUTPUT
+          echo "Packages prepared for release"
+
+      - name: Sign packages
         env:
           GPG_PRIVATE_KEY_PASSWORD: ${{ secrets.GPG_PRIVATE_KEY_PASSWORD }}
         run: |
-          # Sign the AppImage using gpg (handle both passworded and passwordless keys)
-          if [ -n "$GPG_PRIVATE_KEY_PASSWORD" ]; then
-            echo "Signing with password-protected key..."
-            echo "$GPG_PRIVATE_KEY_PASSWORD" | gpg --batch --yes --passphrase-fd 0 --armor --detach-sign "${{ steps.appimage.outputs.path }}"
-          else
-            echo "Signing with passwordless key..."
-            gpg --batch --yes --armor --detach-sign "${{ steps.appimage.outputs.path }}"
+          # Function to sign a file
+          sign_file() {
+            local file_path="$1"
+            echo "Signing: $file_path"
+
+            if [ -n "$GPG_PRIVATE_KEY_PASSWORD" ]; then
+              echo "$GPG_PRIVATE_KEY_PASSWORD" | gpg --batch --yes --passphrase-fd 0 --armor --detach-sign "$file_path"
+            else
+              gpg --batch --yes --armor --detach-sign "$file_path"
+            fi
+
+            # Verify the signature was created
+            if [ -f "$file_path.asc" ]; then
+              echo "GPG signature created for: $file_path"
+              gpg --verify "$file_path.asc" "$file_path"
+            else
+              echo "Error: GPG signature file not created for: $file_path"
+              exit 1
+            fi
+          }
+
+          # Sign AppImage
+          sign_file "${{ steps.packages.outputs.appimage_path }}"
+
+          # Sign DEB package if it exists
+          if [ -n "${{ steps.packages.outputs.deb_path }}" ]; then
+            sign_file "${{ steps.packages.outputs.deb_path }}"
           fi
 
-          # Verify the signature was created
-          if [ -f "${{ steps.appimage.outputs.path }}.asc" ]; then
-            echo "GPG signature created successfully"
-
-            # Verify the signature
-            gpg --verify "${{ steps.appimage.outputs.path }}.asc" "${{ steps.appimage.outputs.path }}"
-            echo "Signature verification completed"
-          else
-            echo "Error: GPG signature file not created"
-            exit 1
+          # Sign RPM package if it exists
+          if [ -n "${{ steps.packages.outputs.rpm_path }}" ]; then
+            sign_file "${{ steps.packages.outputs.rpm_path }}"
           fi
+
+          echo "All available packages signed successfully"
 
       - name: Generate checksums
         id: checksums
         run: |
-          # Generate SHA256 checksum
-          sha256sum "${{ steps.appimage.outputs.path }}" > "${{ steps.appimage.outputs.path }}.sha256"
-          sha256sum "${{ steps.appimage.outputs.path }}.asc" >> "${{ steps.appimage.outputs.path }}.sha256"
+          # Generate SHA256 checksums for all packages
+          CHECKSUM_FILE="./dictaclerk-checksums.sha256"
+
+          # AppImage checksums
+          sha256sum "${{ steps.packages.outputs.appimage_path }}" > "$CHECKSUM_FILE"
+          sha256sum "${{ steps.packages.outputs.appimage_path }}.asc" >> "$CHECKSUM_FILE"
+
+          # DEB package checksums if it exists
+          if [ -n "${{ steps.packages.outputs.deb_path }}" ]; then
+            sha256sum "${{ steps.packages.outputs.deb_path }}" >> "$CHECKSUM_FILE"
+            sha256sum "${{ steps.packages.outputs.deb_path }}.asc" >> "$CHECKSUM_FILE"
+          fi
+
+          # RPM package checksums if it exists
+          if [ -n "${{ steps.packages.outputs.rpm_path }}" ]; then
+            sha256sum "${{ steps.packages.outputs.rpm_path }}" >> "$CHECKSUM_FILE"
+            sha256sum "${{ steps.packages.outputs.rpm_path }}.asc" >> "$CHECKSUM_FILE"
+          fi
 
           # Display checksums
           echo "Generated checksums:"
-          cat "${{ steps.appimage.outputs.path }}.sha256"
+          cat "$CHECKSUM_FILE"
 
-          echo "checksum_file=${{ steps.appimage.outputs.path }}.sha256" >> $GITHUB_OUTPUT
+          echo "checksum_file=$CHECKSUM_FILE" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: release_notes
         run: |
-          cat > release_notes.md << EOF
+          cat > release_notes.md << 'EOF'
           # DictaClerk ${{ steps.version.outputs.tag }}
 
           ## Downloads
 
-          - **AppImage (Linux)**: [dictaclerk.appimage](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage)
+          ### AppImage (Universal Linux)
+          - **AppImage**: [dictaclerk.appimage](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage)
           - **GPG Signature**: [dictaclerk.appimage.asc](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage.asc)
-          - **Checksums**: [dictaclerk.appimage.sha256](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.appimage.sha256)
+
+          ### Debian/Ubuntu Package
+          - **DEB Package**: [dictaclerk.deb](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.deb)
+          - **GPG Signature**: [dictaclerk.deb.asc](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.deb.asc)
+
+          ### RPM Package (Red Hat/Fedora/SUSE)
+          - **RPM Package**: [dictaclerk.rpm](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.rpm)
+          - **GPG Signature**: [dictaclerk.rpm.asc](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk.rpm.asc)
+
+          ### Verification Files
+          - **Checksums**: [dictaclerk-checksums.sha256](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk-checksums.sha256)
+          - **Public Key**: [dictaclerk-signing-key.asc](https://github.com/lsmod/DictaClerk/releases/download/${{ steps.version.outputs.tag }}/dictaclerk-signing-key.asc)
 
           ## Verification
 
@@ -195,14 +260,36 @@ jobs:
           ### Checksum Verification
           To verify file integrity:
           \`\`\`bash
-          sha256sum -c dictaclerk.appimage.sha256
+          sha256sum -c dictaclerk-checksums.sha256
           \`\`\`
 
           ## Installation
 
+          ### AppImage (Universal Linux)
           1. Download the AppImage
           2. Make it executable: \`chmod +x dictaclerk.appimage\`
           3. Run: \`./dictaclerk.appimage\`
+
+          ### Debian/Ubuntu (.deb)
+          \`\`\`bash
+          # Download and install
+          sudo dpkg -i dictaclerk.deb
+
+          # If dependencies are missing, run:
+          sudo apt-get install -f
+          \`\`\`
+
+          ### Red Hat/Fedora/SUSE (.rpm)
+          \`\`\`bash
+          # For RPM-based systems (Fedora, RHEL, CentOS, openSUSE)
+          sudo rpm -i dictaclerk.rpm
+
+          # Or using dnf (Fedora):
+          sudo dnf install dictaclerk.rpm
+
+          # Or using zypper (openSUSE):
+          sudo zypper install dictaclerk.rpm
+          \`\`\`
 
           ## What's New
 
@@ -232,23 +319,39 @@ jobs:
           draft: false
           prerelease: false
           artifacts: |
-            ${{ steps.appimage.outputs.path }}
-            ${{ steps.appimage.outputs.path }}.asc
+            ${{ steps.packages.outputs.appimage_path }}
+            ${{ steps.packages.outputs.appimage_path }}.asc
+            ${{ steps.packages.outputs.deb_path }}
+            ${{ steps.packages.outputs.deb_path }}.asc
+            ${{ steps.packages.outputs.rpm_path }}
+            ${{ steps.packages.outputs.rpm_path }}.asc
             ${{ steps.checksums.outputs.checksum_file }}
             dictaclerk-signing-key.asc
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify AppImage executable and signature
+      - name: Verify packages and signatures
         run: |
           echo "=== Final Verification ==="
 
           # Test AppImage is executable
-          file "${{ steps.appimage.outputs.path }}"
+          file "${{ steps.packages.outputs.appimage_path }}"
 
-          # Verify GPG signature one more time
-          gpg --verify "${{ steps.appimage.outputs.path }}.asc" "${{ steps.appimage.outputs.path }}"
+          # Verify all GPG signatures
+          echo "Verifying AppImage signature..."
+          gpg --verify "${{ steps.packages.outputs.appimage_path }}.asc" "${{ steps.packages.outputs.appimage_path }}"
+
+          if [ -n "${{ steps.packages.outputs.deb_path }}" ]; then
+            echo "Verifying DEB package signature..."
+            gpg --verify "${{ steps.packages.outputs.deb_path }}.asc" "${{ steps.packages.outputs.deb_path }}"
+          fi
+
+          if [ -n "${{ steps.packages.outputs.rpm_path }}" ]; then
+            echo "Verifying RPM package signature..."
+            gpg --verify "${{ steps.packages.outputs.rpm_path }}.asc" "${{ steps.packages.outputs.rpm_path }}"
+          fi
 
           # Verify checksums
+          echo "Verifying checksums..."
           sha256sum -c "${{ steps.checksums.outputs.checksum_file }}"
 
           echo "=== All verifications passed! ==="
